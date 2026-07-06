@@ -25,8 +25,22 @@ func Same(t1, t2 *tree.Tree) bool {
 	ch2 := make(chan int)
 	go Walk(t1, ch1)
 	go Walk(t2, ch2)
-	if <-ch1 != <-ch2 {
-		return false
+
+	for {
+		v1, ok1 := <-ch1
+		v2, ok2 := <-ch2
+
+		// Если один канал закрыт, а другой нет — деревья разной длины
+		if ok1 != ok2 {
+			return false
+		}
+		// Если оба закрыты — все значения сравнены успешно
+		if !ok1 {
+			return true
+		}
+		// Сравниваем значения
+		if v1 != v2 {
+			return false
+		}
 	}
-	return true
 }
