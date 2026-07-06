@@ -28,3 +28,21 @@ func TestWalk(t *testing.T) {
 		t.Error("канал не был закрыт после всех значений")
 	}
 }
+
+func TestSameEqualTree(t *testing.T) {
+	t1 := tree.New(1)
+	t2 := tree.New(1)
+	ok := Same(t1, t2)
+	if !ok {
+		t.Fatalf("Деревья должны быть равны")
+	}
+}
+
+func TestSameDifferentTree(t *testing.T) {
+	t1 := tree.New(1)
+	t2 := tree.New(2)
+	ok := Same(t1, t2)
+	if ok {
+		t.Fatalf("Деревья должны быть разные")
+	}
+}
