@@ -1,5 +1,7 @@
 package todolist
 
-import task "to-do/Task"
+import (
+	task "to-do/Task"
+)
 
 type TodoList []task.Task

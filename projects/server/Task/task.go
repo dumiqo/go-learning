@@ -1,10 +1,15 @@
 package task
 
+import (
+	"github.com/google/uuid"
+)
+
 type Task struct {
-	Title       string   `json:"Title"`
-	Description string   `json:"Description"`
-	Priority    Priority `json:"Priority"`
-	Status      Status   `json:"Status"`
+	Id          uuid.UUID `json:"Id"`
+	Title       string    `json:"Title"`
+	Description string    `json:"Description"`
+	Priority    Priority  `json:"Priority"`
+	Status      Status    `json:"Status"`
 }
 
 type Priority string
