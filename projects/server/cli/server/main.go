@@ -28,8 +28,8 @@ func main() {
 }
 
 func getList(c *gin.Context) {
-	mu.Lock()
-	defer mu.Unlock()
+	mu.RLock()
+	defer mu.RUnlock()
 	c.JSON(http.StatusOK, list)
 }
 
