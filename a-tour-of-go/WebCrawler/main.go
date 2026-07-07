@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sync"
 )
 
 type Fetcher interface {
@@ -10,29 +11,56 @@ type Fetcher interface {
 	Fetch(url string) (body string, urls []string, err error)
 }
 
+var (
+	cache map[string]bool
+	mu    sync.RWMutex
+)
+
 // Crawl uses fetcher to recursively crawl
 // pages starting with url, to a maximum of depth.
-func Crawl(url string, depth int, fetcher Fetcher) {
+func Crawl(url string, depth int, fetcher Fetcher, ch chan string, wg *sync.WaitGroup) {
 	// TODO: Fetch URLs in parallel.
 	// TODO: Don't fetch the same URL twice.
 	// This implementation doesn't do either:
+	defer wg.Done()
 	if depth <= 0 {
 		return
 	}
-	body, urls, err := fetcher.Fetch(url)
+
+	mu.Lock()
+	if cache[url] {
+		mu.Unlock()
+		return
+	}
+	mu.Unlock()
+
+	cache[url] = true
+	_, urls, err := fetcher.Fetch(url)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	fmt.Printf("found: %s %q\n", url, body)
+	ch <- url
 	for _, u := range urls {
-		Crawl(u, depth-1, fetcher)
+		wg.Add(1)
+		go Crawl(u, depth-1, fetcher, ch, wg)
 	}
 	return
 }
 
 func main() {
-	Crawl("https://golang.org/", 4, fetcher)
+	cache = make(map[string]bool)
+	ch := make(chan string)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go Crawl("https://golang.org/", 4, fetcher, ch, &wg)
+	go func() {
+		wg.Wait()
+		close(ch)
+	}()
+	for url := range ch {
+		fmt.Printf("found: %s\n", url)
+	}
 }
 
 // fakeFetcher is Fetcher that returns canned results.
