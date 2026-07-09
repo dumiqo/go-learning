@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sync"
@@ -14,7 +15,7 @@ type CheckResult struct {
 
 var (
 	client = &http.Client{
-		Timeout: 300 * time.Millisecond,
+		Timeout: 1 * time.Second,
 	}
 )
 
@@ -66,14 +67,16 @@ func main() {
 		"https://golang.org/blog/",
 	}
 
-	jobs := make(chan string, 3)
-	result := make(chan CheckResult, 3)
+	jobs := make(chan string, 10)
+	result := make(chan CheckResult)
 	var wg sync.WaitGroup
 	var wg1 sync.WaitGroup
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	for i := 0; i < 3; i++ {
 
 		wg.Add(1)
-		go check(i, jobs, result, &wg)
+		go check(i, jobs, result, &wg, ctx)
 	}
 	wg1.Add(1)
 	go func() {
@@ -91,29 +94,46 @@ func main() {
 		jobs <- v
 	}
 	close(jobs)
-	wg.Wait()
-	close(result)
-	wg1.Wait()
+
+	done := make(chan struct{})
+
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		close(result)
+		wg1.Wait()
+	case <-time.After(1 * time.Second):
+		cancel()
+		fmt.Printf("Timeout\n")
+	}
 }
 
-func check(id int, jobs <-chan string, result chan<- CheckResult, wg *sync.WaitGroup) {
+func check(id int, jobs <-chan string, result chan<- CheckResult, wg *sync.WaitGroup, ctx context.Context) {
 	for {
-		url, ok := <-jobs
-		if !ok {
-			wg.Done()
-			break
-		}
-		fmt.Printf("check start. worker: %d, url: %s\n", id, url)
-		req, err := client.Get(url)
-		if err != nil {
-			result <- CheckResult{false, url}
-			fmt.Printf("check ended. worker: %d, url: %s\n", id, url)
-		} else {
-			valid := req.StatusCode == 200
-			defer req.Body.Close()
+		select {
+		case url, ok := <-jobs:
+			if !ok {
+				wg.Done()
+				break
+			}
+			fmt.Printf("check start. worker: %d, url: %s\n", id, url)
+			req, err := client.Get(url)
+			if err != nil {
+				result <- CheckResult{false, url}
+				fmt.Printf("check ended. worker: %d, url: %s, %s\n", id, url, err)
+			} else {
+				valid := req.StatusCode == 200
+				defer req.Body.Close()
 
-			result <- CheckResult{valid, url}
-			fmt.Printf("check ended. worker: %d, url: %s\n", id, url)
+				result <- CheckResult{valid, url}
+				fmt.Printf("check ended. worker: %d, url: %s\n", id, url)
+			}
+		case <-ctx.Done():
+			wg.Done()
 		}
 	}
 }
