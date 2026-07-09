@@ -13,11 +13,22 @@ type CheckResult struct {
 	Url     string
 }
 
-var (
-	client = &http.Client{
-		Timeout: 1 * time.Second,
+type ValidationClient interface {
+	Check(url string) (bool, error)
+}
+
+type httpValidationClient struct {
+	client *http.Client
+}
+
+func (c httpValidationClient) Check(url string) (bool, error) {
+	resp, err := c.client.Get(url)
+	if err != nil {
+		return false, err
 	}
-)
+	defer resp.Body.Close()
+	return resp.StatusCode == 200, nil
+}
 
 func main() {
 	urls := []string{
@@ -71,12 +82,15 @@ func main() {
 	result := make(chan CheckResult)
 	var wg sync.WaitGroup
 	var wg1 sync.WaitGroup
+	client := httpValidationClient{client: &http.Client{
+		Timeout: 1 * time.Second,
+	}}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	for i := 0; i < 3; i++ {
 
 		wg.Add(1)
-		go check(i, jobs, result, &wg, ctx)
+		go check(client, i, jobs, result, &wg, ctx)
 	}
 	wg1.Add(1)
 	go func() {
@@ -112,7 +126,7 @@ func main() {
 	}
 }
 
-func check(id int, jobs <-chan string, result chan<- CheckResult, wg *sync.WaitGroup, ctx context.Context) {
+func check(client ValidationClient, id int, jobs <-chan string, result chan<- CheckResult, wg *sync.WaitGroup, ctx context.Context) {
 	for {
 		select {
 		case url, ok := <-jobs:
@@ -121,14 +135,11 @@ func check(id int, jobs <-chan string, result chan<- CheckResult, wg *sync.WaitG
 				break
 			}
 			fmt.Printf("check start. worker: %d, url: %s\n", id, url)
-			req, err := client.Get(url)
+			valid, err := client.Check(url)
 			if err != nil {
 				result <- CheckResult{false, url}
 				fmt.Printf("check ended. worker: %d, url: %s, %s\n", id, url, err)
 			} else {
-				valid := req.StatusCode == 200
-				defer req.Body.Close()
-
 				result <- CheckResult{valid, url}
 				fmt.Printf("check ended. worker: %d, url: %s\n", id, url)
 			}
