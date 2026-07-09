@@ -3,7 +3,13 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"sync"
 )
+
+type CheckResult struct {
+	IsValid bool
+	Url     string
+}
 
 func main() {
 	urls := []string{
@@ -54,28 +60,44 @@ func main() {
 	}
 
 	jobs := make(chan string, 3)
+	result := make(chan CheckResult, 3)
+	var wg sync.WaitGroup
 	for i := 0; i < 3; i++ {
-		go check(i, jobs)
+		wg.Add(1)
+		go check(i, jobs, result)
 	}
+
+	go func() {
+		for {
+			r, ok := <-result
+			if !ok {
+				break
+			}
+			wg.Done()
+			fmt.Printf("Result. url: %s, isValid: %t\n", r.Url, r.IsValid)
+		}
+	}()
 
 	for _, v := range urls {
 		jobs <- v
 	}
 	close(jobs)
+	wg.Wait()
+	close(result)
 }
 
-func check(id int, jobs <-chan string) {
+func check(id int, jobs <-chan string, result chan<- CheckResult) {
 	for url := range jobs {
 		fmt.Printf("check start. worker: %d, url: %s\n", id, url)
-		defer fmt.Printf("check ended. worker: %d, url: %s\n", id, url)
 		req, err := http.Get(url)
 		if err != nil {
+			result <- CheckResult{false, url}
+			fmt.Printf("check ended. worker: %d, url: %s\n", id, url)
+		} else {
+			valid := req.StatusCode == 200
 
-			fmt.Printf("check error. worker: %d, url: %s, isValid: %s\n", id, url, err)
-			return
+			result <- CheckResult{valid, url}
+			fmt.Printf("check ended. worker: %d, url: %s\n", id, url)
 		}
-		valid := req.StatusCode == 200
-
-		fmt.Printf("check result. worker: %d, url: %s, isValid: %t\n", id, url, valid)
 	}
 }
