@@ -4,12 +4,19 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 )
 
 type CheckResult struct {
 	IsValid bool
 	Url     string
 }
+
+var (
+	client = &http.Client{
+		Timeout: 300 * time.Millisecond,
+	}
+)
 
 func main() {
 	urls := []string{
@@ -62,18 +69,20 @@ func main() {
 	jobs := make(chan string, 3)
 	result := make(chan CheckResult, 3)
 	var wg sync.WaitGroup
+	var wg1 sync.WaitGroup
 	for i := 0; i < 3; i++ {
-		wg.Add(1)
-		go check(i, jobs, result)
-	}
 
+		wg.Add(1)
+		go check(i, jobs, result, &wg)
+	}
+	wg1.Add(1)
 	go func() {
 		for {
 			r, ok := <-result
 			if !ok {
+				wg1.Done()
 				break
 			}
-			wg.Done()
 			fmt.Printf("Result. url: %s, isValid: %t\n", r.Url, r.IsValid)
 		}
 	}()
@@ -84,17 +93,24 @@ func main() {
 	close(jobs)
 	wg.Wait()
 	close(result)
+	wg1.Wait()
 }
 
-func check(id int, jobs <-chan string, result chan<- CheckResult) {
-	for url := range jobs {
+func check(id int, jobs <-chan string, result chan<- CheckResult, wg *sync.WaitGroup) {
+	for {
+		url, ok := <-jobs
+		if !ok {
+			wg.Done()
+			break
+		}
 		fmt.Printf("check start. worker: %d, url: %s\n", id, url)
-		req, err := http.Get(url)
+		req, err := client.Get(url)
 		if err != nil {
 			result <- CheckResult{false, url}
 			fmt.Printf("check ended. worker: %d, url: %s\n", id, url)
 		} else {
 			valid := req.StatusCode == 200
+			defer req.Body.Close()
 
 			result <- CheckResult{valid, url}
 			fmt.Printf("check ended. worker: %d, url: %s\n", id, url)
