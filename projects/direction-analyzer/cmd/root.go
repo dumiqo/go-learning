@@ -8,6 +8,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -17,9 +19,53 @@ var (
 	rootPath string
 )
 
+type FileNode struct {
+	Path     string
+	Name     string
+	Size     uint64
+	Children []*FileNode
+	IsFolder bool
+}
+
 type FileInfo struct {
-	Folder, Name string
-	Size         int64
+	Path, Name string
+	Size       uint64
+	IsFolder   bool
+}
+
+func (f *FileNode) Find(path string) *FileNode {
+	if f == nil {
+		return nil
+	}
+	if !f.IsFolder {
+		return nil
+	}
+	fPath := strings.TrimSuffix(f.Path, "\\")
+	path = strings.TrimSuffix(path, "\\")
+	if fPath+"\\"+f.Name == path {
+		return f
+	}
+	for _, v := range f.Children {
+		x := v.Find(path)
+		if x != nil {
+			return x
+		}
+	}
+	return nil
+}
+
+func (f *FileNode) TotalSize() uint64 {
+	if f == nil {
+		return 0
+	}
+	if !f.IsFolder {
+		return f.Size
+	}
+	totalSize := f.Size
+	for _, v := range f.Children {
+		totalSize += v.TotalSize()
+	}
+	return totalSize
 }
 
 // rootCmd represents the base command when called without any subcommands
@@ -30,8 +76,7 @@ var rootCmd = &cobra.Command{
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
-		infos := []FileInfo{}
-		rootPathLen := len(rootPath)
+		infos := make([]FileInfo, 0)
 		filepath.WalkDir(rootPath, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return err
@@ -40,20 +85,47 @@ var rootCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			if !d.IsDir() {
-				fileName := info.Name()
-				folder := path[rootPathLen:]
-				folder = folder[:len(folder)-len(fileName)]
-				infos = append(infos, FileInfo{folder, fileName, info.Size()})
+			if path == rootPath {
+				return nil
 			}
+			fileName := info.Name()
+			path = strings.TrimSuffix(path, "\\")
+			folderPath := path[:len(path)-len(fileName)]
+			infos = append(infos, FileInfo{folderPath, fileName, uint64(info.Size()), d.IsDir()})
 
 			return nil
 		})
-		writer := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		root := FileNode{rootPath, rootPath, 0, make([]*FileNode, 0), true}
+
+		sort.Slice(infos, func(i, j int) bool {
+			// Сначала папки, потом файлы
+			if infos[i].IsFolder != infos[j].IsFolder {
+				return infos[i].IsFolder // true идёт раньше
+			}
+			return strings.Count(infos[i].Path, "\\") < strings.Count(infos[j].Path, "\\")
+		})
 		for _, info := range infos {
-			fmt.Fprintf(writer, "%s\t%s\t%d\n", info.Folder, info.Name, info.Size)
+			if info.Path == rootPath {
+				root.Children = append(root.Children, &FileNode{info.Path, info.Name, info.Size, make([]*FileNode, 0), info.IsFolder})
+			} else {
+				node := root.Find(info.Path)
+
+				if node == nil {
+					break
+				}
+
+				node.Children = append(node.Children, &FileNode{info.Path, info.Name, info.Size, make([]*FileNode, 0), info.IsFolder})
+			}
 		}
-		writer.Flush()
+		writer := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		defer writer.Flush()
+		fmt.Fprintf(writer, "Name\tSize\tIsFolder\n")
+		for _, v := range root.Children {
+			fmt.Fprintf(writer, "%s\t%d\t%t\n",
+				v.Name,
+				v.TotalSize(),
+				v.IsFolder)
+		}
 	},
 }
 
