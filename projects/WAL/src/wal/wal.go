@@ -1,33 +1,49 @@
 package wal
 
-import "os"
-
-var (
-	path = "D:\\tmp\\file"
+import (
+	"fmt"
+	"os"
+	"sync"
 )
 
-func Write(entry Entry) (int, error) {
-	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	defer file.Close()
-	if err != nil {
-		return -1, err
-	}
-	_, err = file.WriteString(entry.Command)
-	if err != nil {
-		return -1, err
-	}
-	err = file.Sync() // вызывает fsync
-	if err != nil {
-		return -1, err
-	}
-	return 0, nil
+type WAL struct {
+	File        *os.File
+	IndexOffset map[uint64]int64 // индекс → смещение в файле
+	MaxIndex    uint64
+	Mu          sync.RWMutex
 }
 
-func Read(index int) (*Entry, error) {
-	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	defer file.Close()
+func (w *WAL) Write(command Command) (uint64, error) {
+	w.Mu.Lock()
+	defer w.Mu.Unlock()
+	entry := Entry{w.MaxIndex, command, 0}
+	log, err := entry.ToLog()
+
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	return &Entry{}, nil
+	_, err = fmt.Fprintln(w.File, log)
+	if err != nil {
+		return 0, err
+	}
+	// w.index[entry.Index] = count
+	err = w.File.Sync() // вызывает fsync
+	if err != nil {
+		return 0, err
+	}
+	w.MaxIndex = w.MaxIndex + 1
+	return entry.Index, nil
+}
+
+func (w *WAL) Read(index uint64) (Command, error) {
+	w.Mu.RLock()
+	defer w.Mu.RUnlock()
+
+	if index >= w.MaxIndex {
+		return Command{}, fmt.Errorf("invalid index, max index %d", w.MaxIndex)
+	}
+	// offset := w.index[index]
+
+	// w.file.see
+	return &Command{}, nil
 }

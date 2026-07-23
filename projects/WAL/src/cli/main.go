@@ -2,11 +2,24 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"sync"
 	"wal/src/wal"
 )
 
 func main() {
-	index, _ := wal.Write(wal.Entry{"select * from tmp", nil})
-	entry, _ := wal.Read(index)
+	file, err := os.OpenFile("D:\\tmp\\file", os.O_APPEND, 0644)
+	if err != nil {
+		fmt.Println("Error")
+		return
+	}
+	log := wal.WAL{file, make(map[uint64]int64), 0, sync.RWMutex{}}
+	index, _ := log.Write(wal.Command{"select * from dtp", nil})
+	index, _ = log.Write(wal.Command{"select * from tmp", nil})
+	index, _ = log.Write(wal.Command{"select * from zxtmp", nil})
+	index, _ = log.Write(wal.Command{"select * from tmp", nil})
+	index, _ = log.Write(wal.Command{"select * from fd", nil})
+	index, _ = log.Write(wal.Command{"select * from tmp", nil})
+	entry, _ := log.Read(index)
 	fmt.Println(entry.Command)
 }
