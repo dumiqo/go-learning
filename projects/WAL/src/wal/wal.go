@@ -45,5 +45,5 @@ func (w *WAL) Read(index uint64) (Command, error) {
 	// offset := w.index[index]
 
 	// w.file.see
-	return &Command{}, nil
+	return Command{}, nil
 }
