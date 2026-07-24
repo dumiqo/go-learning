@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 	"sync"
-	"wal/src/wal"
+	"wal/wal"
 )
 
 func main() {
-	file, err := os.OpenFile("D:\\tmp\\file", os.O_APPEND, 0644)
+	file, err := os.OpenFile("D:\\tmp\\file", os.O_APPEND|os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		fmt.Println("Error")
 		return
