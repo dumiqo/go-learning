@@ -14,7 +14,8 @@ type Positions struct {
 }
 
 type WAL struct {
-	File        *os.File
+	Writer      *os.File
+	Reader      *os.File
 	IndexOffset map[uint64]Positions // индекс → смещение в файле
 	MaxIndex    uint64
 	Mu          sync.RWMutex
@@ -28,15 +29,15 @@ func (w *WAL) Write(command Command) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	offset, err := w.File.Seek(0, io.SeekCurrent)
+	offset, err := w.Writer.Seek(0, io.SeekCurrent)
 	if err != nil {
 		return 0, err
 	}
-	n, err := fmt.Fprintln(w.File, log)
+	n, err := fmt.Fprintln(w.Writer, log)
 	if err != nil {
 		return 0, err
 	}
-	err = w.File.Sync() // медленно, лучше делать раз в n мс
+	err = w.Writer.Sync() // медленно, лучше делать раз в n мс
 	if err != nil {
 		return 0, err
 	}
@@ -55,7 +56,7 @@ func (w *WAL) Read(index uint64) (Command, error) {
 	position := w.IndexOffset[index]
 	buf := make([]byte, position.Count)
 
-	_, err := w.File.ReadAt(buf, position.Offset)
+	_, err := w.Reader.ReadAt(buf, position.Offset)
 
 	if err != nil {
 		return Command{}, err
