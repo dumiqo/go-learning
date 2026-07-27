@@ -17,11 +17,11 @@ func main() {
 	}
 	log := wal.WAL{writer, reader, make(map[uint64]wal.Positions), 0, sync.RWMutex{}}
 	index, _ := log.Write(wal.Command{"select * from dtp", nil})
-	index, _ = log.Write(wal.Command{"select * from tmp", nil})
+	_, _ = log.Write(wal.Command{"select * from tmp", nil})
 	index, _ = log.Write(wal.Command{"select * from zxtmp", nil})
-	index, _ = log.Write(wal.Command{"select * from tmp", nil})
-	index, _ = log.Write(wal.Command{"select * from fd", nil})
-	index, _ = log.Write(wal.Command{"select * from zzz", nil})
+	index, _ = log.Write(wal.Command{"select * from tm1p", nil})
+	_, _ = log.Write(wal.Command{"select * from fd", nil})
+	_, _ = log.Write(wal.Command{"select * from zzz", nil})
 	entry, _ := log.Read(index)
 	fmt.Println(entry.Command)
 }

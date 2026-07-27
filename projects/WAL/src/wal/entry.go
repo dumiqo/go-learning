@@ -7,37 +7,27 @@ import (
 	"strings"
 )
 
-type Command struct {
-	Command string
-	Values  []string
-}
-
 type Entry struct {
 	Index   uint64
+	Data    []byte
 	Command Command
 	CRC32   uint32
 }
 
-func (c *Command) Encode() ([]byte, uint32, error) {
-	value := fmt.Sprintf("%s;%s",
-		c.Command,
-		strings.Join(c.Values, ","),
-	)
-
-	crc := crc32.ChecksumIEEE([]byte(value))
-	return []byte(value), crc, nil
+func New(index uint64, command Command) (Entry, error) {
+	data, err := command.Encode()
+	if err != nil {
+		return Entry{}, err
+	}
+	crc := crc32.ChecksumIEEE(data)
+	return Entry{index, data, command, crc}, nil
 }
 
 func (e *Entry) ToLog() (string, error) {
-	data, crc, err := e.Command.Encode()
-	e.CRC32 = crc
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("%d|%s|%d", e.Index, data, e.CRC32), nil
+	return fmt.Sprintf("%d|%s|%d", e.Index, e.Data, e.CRC32), nil
 }
-func EntryFromLog(line string) (Entry, error) {
+
+func FromLog(line string) (Entry, error) {
 	parts := strings.Split(line, "|")
 	if len(parts) != 3 {
 		return Entry{}, fmt.Errorf("invalid log format")
@@ -53,14 +43,9 @@ func EntryFromLog(line string) (Entry, error) {
 		return Entry{}, err
 	}
 
-	cmdParts := strings.SplitN(parts[1], ";", 2)
-	if len(cmdParts) != 2 {
-		return Entry{}, fmt.Errorf("invalid command")
-	}
-
-	cmd := Command{
-		Command: cmdParts[0],
-		Values:  strings.Split(cmdParts[1], ","),
+	cmd, err := Decode(parts[1])
+	if err != nil {
+		return Entry{}, err
 	}
 
 	data := []byte(parts[1])
@@ -70,9 +55,9 @@ func EntryFromLog(line string) (Entry, error) {
 		return Entry{}, fmt.Errorf("crc mismatch")
 	}
 
-	return Entry{
-		Index:   index,
-		Command: cmd,
-		CRC32:   uint32(crc),
-	}, nil
+	entry, err := New(index, cmd)
+	if err != nil {
+		return Entry{}, err
+	}
+	return entry, nil
 }

@@ -24,7 +24,10 @@ type WAL struct {
 func (w *WAL) Write(command Command) (uint64, error) {
 	w.Mu.Lock()
 	defer w.Mu.Unlock()
-	entry := Entry{w.MaxIndex, command, 0}
+	entry, err := New(w.MaxIndex, command)
+	if err != nil {
+		return 0, err
+	}
 	log, err := entry.ToLog()
 	if err != nil {
 		return 0, err
@@ -62,7 +65,9 @@ func (w *WAL) Read(index uint64) (Command, error) {
 		return Command{}, err
 	}
 
-	entry, err := EntryFromLog(strings.TrimSpace(string(buf)))
-
+	entry, err := FromLog(strings.TrimSpace(string(buf)))
+	if err != nil {
+		return Command{}, err
+	}
 	return entry.Command, nil
 }
