@@ -1,6 +1,7 @@
 package wal
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -14,17 +15,30 @@ type Positions struct {
 }
 
 type WAL struct {
-	Writer      *os.File
-	Reader      *os.File
-	IndexOffset map[uint64]Positions // индекс → смещение в файле
-	MaxIndex    uint64
-	Mu          sync.RWMutex
+	indexOffset    map[uint64]Positions // индекс → смещение в файле
+	maxIndex       uint64
+	mu             sync.RWMutex
+	writer, reader *os.File
+}
+
+func NewWal(dirPath, fileName string) (*WAL, error) {
+	filePath := dirPath + "\\" + fileName
+	writer, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE, 0644)
+	if err != nil {
+		return nil, errors.New("Invalid file path")
+	}
+	reader, err := os.OpenFile(filePath, os.O_RDONLY, 0644)
+	if err != nil {
+		return nil, errors.New("Invalid file path")
+	}
+
+	return &WAL{make(map[uint64]Positions), 0, sync.RWMutex{}, writer, reader}, nil
 }
 
 func (w *WAL) Write(command Command) (uint64, error) {
-	w.Mu.Lock()
-	defer w.Mu.Unlock()
-	entry, err := New(w.MaxIndex, command)
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	entry, err := NewEntry(w.maxIndex, command)
 	if err != nil {
 		return 0, err
 	}
@@ -32,34 +46,34 @@ func (w *WAL) Write(command Command) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	offset, err := w.Writer.Seek(0, io.SeekCurrent)
+	offset, err := w.writer.Seek(0, io.SeekCurrent)
 	if err != nil {
 		return 0, err
 	}
-	n, err := fmt.Fprintln(w.Writer, log)
+	n, err := fmt.Fprintln(w.writer, log)
 	if err != nil {
 		return 0, err
 	}
-	err = w.Writer.Sync() // медленно, лучше делать раз в n мс
+	err = w.writer.Sync() // медленно, лучше делать раз в n мс
 	if err != nil {
 		return 0, err
 	}
-	w.IndexOffset[w.MaxIndex] = Positions{offset, n}
-	w.MaxIndex = w.MaxIndex + 1
+	w.indexOffset[w.maxIndex] = Positions{offset, n}
+	w.maxIndex = w.maxIndex + 1
 	return entry.Index, nil
 }
 
 func (w *WAL) Read(index uint64) (Command, error) {
-	w.Mu.RLock()
-	defer w.Mu.RUnlock()
+	w.mu.RLock()
+	defer w.mu.RUnlock()
 
-	if index >= w.MaxIndex {
-		return Command{}, fmt.Errorf("invalid index, max index %d", w.MaxIndex)
+	if index >= w.maxIndex {
+		return Command{}, fmt.Errorf("invalid index, max index %d", w.maxIndex)
 	}
-	position := w.IndexOffset[index]
+	position := w.indexOffset[index]
 	buf := make([]byte, position.Count)
 
-	_, err := w.Reader.ReadAt(buf, position.Offset)
+	_, err := w.reader.ReadAt(buf, position.Offset)
 
 	if err != nil {
 		return Command{}, err
