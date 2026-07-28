@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"wal/internal/testutil"
 	"wal/internal/wal"
 )
 
@@ -15,7 +16,7 @@ func main() {
 	index := uint64(0)
 	for i := 0; i < 500_000; i++ {
 
-		index, err = w.Write(wal.Generate())
+		index, err = w.Write(testutil.GenerateTestCommand())
 		if err != nil {
 			panic("Cant write log")
 		}
