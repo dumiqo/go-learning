@@ -128,7 +128,7 @@ func newFileName(currentName, startName string) string {
 		if err != nil {
 			return startName + "001"
 		}
-		return startName + fmt.Sprintf("%02d", number)
+		return startName + fmt.Sprintf("%03d", number+1)
 	}
 
 	return startName + "001"
