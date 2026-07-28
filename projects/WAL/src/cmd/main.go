@@ -14,7 +14,7 @@ func main() {
 	}
 
 	index := uint64(0)
-	for i := 0; i < 10000; i++ {
+	for i := 0; i < 500_000; i++ {
 
 		rnd := rand.Text()
 		index, err = w.Write(wal.Command{"select * from " + rnd, []string{rand.Text(), rand.Text()}})

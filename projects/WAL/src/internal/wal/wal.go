@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -26,7 +27,7 @@ type WAL struct {
 }
 
 func NewWal(dirPath, fileName string) *WAL {
-	return &WAL{make(map[uint64]Position), sync.RWMutex{}, dirPath, fileName, nil, nil, 1024} //1 kb
+	return &WAL{make(map[uint64]Position), sync.RWMutex{}, dirPath, fileName, nil, nil, 1024 * 100}
 }
 
 func (w *WAL) Init() error {
@@ -105,22 +106,37 @@ func (w *WAL) Read(index uint64) (Command, error) {
 }
 
 func (w *WAL) rotate() {
-	// w.mu.RLock()
-	// defer w.mu.RUnlock()
+	stat, _ := os.Stat(w.writer.Name())
 
-	name := w.reader.Name()
-	stat, _ := os.Stat(name)
-	//у нас есть имя текущего файла и име исходного файла, нужно понять какой индекс выставить и создать новый файл
-	//ридер не нужно создавать, так как приходится просчитывать все файлы для поиска нужного
-	f := stat.Name()
-	size := stat.Size()
-	w.file = f + string(size)
-	w.direction = w.file
-	// w.reader.ReadDir()
+	newFileName := newFileName(stat.Name(), w.file)
+	filePath := filepath.Join(w.direction, newFileName)
+	writer, err := os.OpenFile(filePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		panic("Cant rotate")
+	}
+	w.writer = writer
+}
+
+func newFileName(currentName, startName string) string {
+	if currentName == startName {
+		return startName + "001"
+	}
+
+	if len(currentName) > len(startName) {
+		numberPart := currentName[len(startName):]
+		number, err := strconv.Atoi(numberPart)
+		if err != nil {
+			return startName + "001"
+		}
+		return startName + fmt.Sprintf("%02d", number)
+	}
+
+	return startName + "001"
 }
 
 func (w *WAL) needRotate() bool {
-	name := w.reader.Name()
+	name := w.writer.Name()
 	stat, _ := os.Stat(name)
-	return w.maxSize <= stat.Size()
+	size := stat.Size()
+	return w.maxSize <= size
 }
