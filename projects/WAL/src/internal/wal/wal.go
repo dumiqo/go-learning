@@ -27,7 +27,7 @@ type WAL struct {
 }
 
 func NewWal(dirPath, fileName string) *WAL {
-	return &WAL{make(map[uint64]Position), sync.RWMutex{}, dirPath, fileName, nil, nil, 1024 * 100}
+	return &WAL{make(map[uint64]Position), sync.RWMutex{}, dirPath, fileName, nil, nil, 1024 * 1024}
 }
 
 func (w *WAL) Init() error {
@@ -56,7 +56,10 @@ func (w *WAL) Write(command Command) (uint64, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if w.needRotate() {
-		w.rotate()
+		err := w.rotate()
+		if err != nil {
+			return 0, err
+		}
 	}
 	entry, err := NewEntry(uint64(len(w.index)), command)
 	if err != nil {
@@ -105,16 +108,21 @@ func (w *WAL) Read(index uint64) (Command, error) {
 	return entry.Command, nil
 }
 
-func (w *WAL) rotate() {
+func (w *WAL) rotate() error {
 	stat, _ := os.Stat(w.writer.Name())
 
 	newFileName := newFileName(stat.Name(), w.file)
 	filePath := filepath.Join(w.direction, newFileName)
 	writer, err := os.OpenFile(filePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
-		panic("Cant rotate")
+		return err
+	}
+	err = w.writer.Sync() // медленно, лучше делать раз в n мс
+	if err != nil {
+		return err
 	}
 	w.writer = writer
+	return nil
 }
 
 func newFileName(currentName, startName string) string {

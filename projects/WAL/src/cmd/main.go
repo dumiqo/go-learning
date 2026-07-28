@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/rand"
 	"fmt"
 	"wal/internal/wal"
 )
@@ -16,8 +15,7 @@ func main() {
 	index := uint64(0)
 	for i := 0; i < 500_000; i++ {
 
-		rnd := rand.Text()
-		index, err = w.Write(wal.Command{"select * from " + rnd, []string{rand.Text(), rand.Text()}})
+		index, err = w.Write(wal.Generate())
 		if err != nil {
 			panic("Cant write log")
 		}
