@@ -17,7 +17,10 @@ func main() {
 	for i := 0; i < 100; i++ {
 
 		rnd := rand.Text()
-		index, _ = w.Write(wal.Command{"select * from " + rnd, []string{rand.Text()}})
+		index, err = w.Write(wal.Command{"select * from " + rnd, []string{rand.Text()}})
+		if err != nil {
+			panic("Cant write log")
+		}
 	}
 	entry, _ := w.Read(index)
 	fmt.Println(entry.Command)
