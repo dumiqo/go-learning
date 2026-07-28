@@ -19,23 +19,12 @@ type WAL struct {
 
 	mu sync.RWMutex
 
-	writer, reader *os.File
+	direction, file string
+	writer, reader  *os.File
 }
 
-func NewWal(dirPath, fileName string) (*WAL, error) {
-	filePath := filepath.Join(dirPath, fileName)
-	writer, err := os.OpenFile(filePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
-	if err != nil {
-		return nil, fmt.Errorf("open writer: %w", err)
-	}
-	reader, err := os.OpenFile(filePath, os.O_RDONLY, 0644)
-	if err != nil {
-		return nil, fmt.Errorf("open reader: %w", err)
-	}
-
-	wal := WAL{make(map[uint64]Position), sync.RWMutex{}, writer, reader}
-
-	return &wal, nil
+func NewWal(dirPath, fileName string) *WAL {
+	return &WAL{make(map[uint64]Position), sync.RWMutex{}, dirPath, fileName, nil, nil}
 }
 
 func (w *WAL) Close() error {
@@ -45,8 +34,19 @@ func (w *WAL) Close() error {
 	return w.reader.Close()
 }
 
-func (wal *WAL) Init() {
-
+func (w *WAL) Init() error {
+	filePath := filepath.Join(w.direction, w.file)
+	writer, err := os.OpenFile(filePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return fmt.Errorf("open writer: %w", err)
+	}
+	reader, err := os.OpenFile(filePath, os.O_RDONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("open reader: %w", err)
+	}
+	w.writer = writer
+	w.reader = reader
+	return nil
 }
 
 func (w *WAL) Write(command Command) (uint64, error) {

@@ -1,22 +1,25 @@
 package main
 
 import (
+	"crypto/rand"
 	"fmt"
 	"wal/wal"
 )
 
 func main() {
-	log, err := wal.NewWal("D:\\tmp", "file")
+	w := wal.NewWal("D:\\tmp", "file")
+	err := w.Init()
 	if err != nil {
-		panic("Cant start WAL")
+		panic("Cant init WAL")
 	}
-	index, _ := log.Write(wal.Command{"select * from dtp", nil})
-	_, _ = log.Write(wal.Command{"select * from tmp", nil})
-	index, _ = log.Write(wal.Command{"select * from zxtmp", nil})
-	index, _ = log.Write(wal.Command{"select * from tm2p", nil})
-	_, _ = log.Write(wal.Command{"select * from fd", nil})
-	_, _ = log.Write(wal.Command{"select * from zzz", nil})
-	entry, _ := log.Read(index)
+
+	index := uint64(0)
+	for i := 0; i < 100; i++ {
+
+		rnd := rand.Text()
+		index, _ = w.Write(wal.Command{"select * from " + rnd, []string{rand.Text()}})
+	}
+	entry, _ := w.Read(index)
 	fmt.Println(entry.Command)
-	log.Close()
+	w.Close()
 }
