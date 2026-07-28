@@ -13,9 +13,10 @@ func main() {
 	index, _ := log.Write(wal.Command{"select * from dtp", nil})
 	_, _ = log.Write(wal.Command{"select * from tmp", nil})
 	index, _ = log.Write(wal.Command{"select * from zxtmp", nil})
-	index, _ = log.Write(wal.Command{"select * from tm1p", nil})
+	index, _ = log.Write(wal.Command{"select * from tm2p", nil})
 	_, _ = log.Write(wal.Command{"select * from fd", nil})
 	_, _ = log.Write(wal.Command{"select * from zzz", nil})
 	entry, _ := log.Read(index)
 	fmt.Println(entry.Command)
+	log.Close()
 }
