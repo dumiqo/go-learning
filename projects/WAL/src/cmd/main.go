@@ -3,7 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"fmt"
-	"wal/wal"
+	"wal/internal/wal"
 )
 
 func main() {
@@ -14,15 +14,15 @@ func main() {
 	}
 
 	index := uint64(0)
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 10000; i++ {
 
 		rnd := rand.Text()
-		index, err = w.Write(wal.Command{"select * from " + rnd, []string{rand.Text()}})
+		index, err = w.Write(wal.Command{"select * from " + rnd, []string{rand.Text(), rand.Text()}})
 		if err != nil {
 			panic("Cant write log")
 		}
 	}
-	entry, _ := w.Read(index)
-	fmt.Println(entry.Command)
+	command, _ := w.Read(index)
+	fmt.Println(command.Command, command.Values)
 	w.Close()
 }
