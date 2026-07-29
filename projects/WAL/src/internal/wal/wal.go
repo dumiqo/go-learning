@@ -10,13 +10,14 @@ import (
 	"sync"
 )
 
-type Position struct {
-	Offset int64
-	Count  int
+type position struct {
+	offset int64
+	count  int
+	file   string
 }
 
 type WAL struct {
-	index map[uint64]Position // индекс → смещение в файле
+	index map[uint64]position // индекс → смещение в файле
 
 	mu sync.RWMutex
 
@@ -27,7 +28,7 @@ type WAL struct {
 }
 
 func NewWal(dirPath, fileName string) *WAL {
-	return &WAL{make(map[uint64]Position), sync.RWMutex{}, dirPath, fileName, nil, nil, 1024 * 1024}
+	return &WAL{make(map[uint64]position), sync.RWMutex{}, dirPath, fileName, nil, nil, 1024 * 1024}
 }
 
 func (w *WAL) Init() error {
@@ -81,7 +82,8 @@ func (w *WAL) Write(command Command) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	w.index[uint64(len(w.index))] = Position{offset, n}
+	stat, _ := os.Stat(w.writer.Name())
+	w.index[uint64(len(w.index))] = position{offset, n, stat.Name()}
 	return entry.Index, nil
 }
 
@@ -93,9 +95,17 @@ func (w *WAL) Read(index uint64) (Command, error) {
 		return Command{}, fmt.Errorf("invalid index, max index %d", uint64(len(w.index)))
 	}
 	position := w.index[index]
-	buf := make([]byte, position.Count)
-
-	_, err := w.reader.ReadAt(buf, position.Offset)
+	buf := make([]byte, position.count)
+	stat, _ := os.Stat(w.reader.Name())
+	if stat.Name() != position.file {
+		filePath := filepath.Join(w.direction, w.file)
+		reader, err := os.OpenFile(filePath, os.O_RDONLY, 0644)
+		if err != nil {
+			return Command{}, fmt.Errorf("open reader: %w", err)
+		}
+		w.reader = reader
+	}
+	_, err := w.reader.ReadAt(buf, position.offset)
 
 	if err != nil {
 		return Command{}, err

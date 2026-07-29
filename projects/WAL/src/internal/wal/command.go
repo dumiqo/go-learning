@@ -1,7 +1,6 @@
 package wal
 
 import (
-	"crypto/rand"
 	"fmt"
 	"strings"
 )
@@ -9,12 +8,6 @@ import (
 type Command struct {
 	Command string
 	Values  []string
-}
-
-func Generate() Command {
-
-	rnd := rand.Text()
-	return Command{"select * from " + rnd, []string{rand.Text(), rand.Text()}}
 }
 
 func (c *Command) Encode() ([]byte, error) {

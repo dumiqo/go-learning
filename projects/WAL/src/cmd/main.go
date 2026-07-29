@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math/rand/v2"
 	"wal/internal/testutil"
 	"wal/internal/wal"
 )
@@ -13,15 +14,17 @@ func main() {
 		panic("Cant init WAL")
 	}
 
-	index := uint64(0)
-	for i := 0; i < 500_000; i++ {
+	for i := 0; i < 12_000; i++ {
 
-		index, err = w.Write(testutil.GenerateTestCommand())
-		if err != nil {
-			panic("Cant write log")
-		}
+		w.Write(testutil.GenerateTestCommand())
 	}
-	command, _ := w.Read(index)
-	fmt.Println(command.Command, command.Values)
+	for i := 0; i < 10; i++ {
+		index := uint64(rand.Int32N(12_000))
+		command, err := w.Read(index)
+		if err != nil {
+			fmt.Println("%w", err)
+		}
+		fmt.Println(command.Command, command.Values)
+	}
 	w.Close()
 }
