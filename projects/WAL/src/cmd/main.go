@@ -14,17 +14,19 @@ func main() {
 		panic("Cant init WAL")
 	}
 
-	for i := 0; i < 12_000; i++ {
-
-		w.Write(testutil.GenerateTestCommand())
+	count := 33_000
+	variables := 1_000
+	commands := testutil.GenerateTestCommand(count, variables)
+	for _, commad := range commands {
+		w.Write(commad)
 	}
 	for i := 0; i < 10; i++ {
-		index := uint64(rand.Int32N(12_000))
+		index := uint64(rand.Int32N((int32(count))))
 		command, err := w.Read(index)
 		if err != nil {
 			fmt.Println("%w", err)
 		}
-		fmt.Println(command.Command, command.Values)
+		fmt.Println(command.Command, command.Property, command.Value)
 	}
 	w.Close()
 }
