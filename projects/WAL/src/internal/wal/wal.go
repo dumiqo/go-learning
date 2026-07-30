@@ -5,9 +5,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/pkg/errors"
 )
 
 type position struct {
@@ -47,6 +50,7 @@ func (w *WAL) Init() error {
 }
 
 func (w *WAL) Close() error {
+	// получается что мы можем получить ошибку при закрытие writer и не попытаться закрыть reader
 	if err := w.writer.Close(); err != nil {
 		return err
 	}
@@ -101,21 +105,44 @@ func (w *WAL) Read(index uint64) (Command, error) {
 		filePath := filepath.Join(w.direction, w.file)
 		reader, err := os.OpenFile(filePath, os.O_RDONLY, 0644)
 		if err != nil {
-			return Command{}, fmt.Errorf("open reader: %w", err)
+			return Command{}, errors.Wrap(err, "error in reading")
 		}
 		w.reader = reader
 	}
 	_, err := w.reader.ReadAt(buf, position.offset)
 
 	if err != nil {
-		return Command{}, err
+		return Command{}, errors.Wrap(err, "error in reading")
 	}
 
 	entry, err := FromLog(strings.TrimSpace(string(buf)))
 	if err != nil {
-		return Command{}, err
+		return Command{}, errors.Wrap(err, "error in reading")
 	}
 	return entry.Command, nil
+}
+
+func (w *WAL) saveSnapshot() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	files, err := os.ReadDir(w.direction)
+	if err != nil {
+		return errors.Wrap(err, "cant save snapshot")
+	}
+	var names []string
+	for _, file := range files {
+		names = append(names, file.Name())
+	}
+	sort.Strings(names)
+	state = make(map[string]string)
+
+	for _, name := range names {
+		reader, err := os.OpenFile(filepath.Join(w.direction, name), os.O_RDONLY, 0664)
+		if err != nil {
+			return errors.Wrap(err, "cant save snapshot")
+		}
+	}
 }
 
 func (w *WAL) rotate() error {
@@ -125,11 +152,11 @@ func (w *WAL) rotate() error {
 	filePath := filepath.Join(w.direction, newFileName)
 	writer, err := os.OpenFile(filePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "cant rotate")
 	}
 	err = w.writer.Sync() // медленно, лучше делать раз в n мс
 	if err != nil {
-		return err
+		return errors.Wrap(err, "cant rotate")
 	}
 	w.writer = writer
 	return nil
