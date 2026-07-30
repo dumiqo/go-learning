@@ -1,14 +1,16 @@
 package wal
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 )
@@ -27,11 +29,13 @@ type WAL struct {
 	direction, file string
 	writer, reader  *os.File
 
-	maxSize int64
+	maxSize       int64
+	lastIdex      uint64
+	snapshotIndex uint64
 }
 
 func NewWal(dirPath, fileName string) *WAL {
-	return &WAL{make(map[uint64]position), sync.RWMutex{}, dirPath, fileName, nil, nil, 1024 * 1024}
+	return &WAL{make(map[uint64]position), sync.RWMutex{}, dirPath, fileName, nil, nil, 1024 * 1024, 0, 0}
 }
 
 func (w *WAL) Init() error {
@@ -47,6 +51,17 @@ func (w *WAL) Init() error {
 	w.writer = writer
 	w.reader = reader
 	return nil
+}
+
+func (w *WAL) StartPeriodicSnapshot(interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop() // важно освободить ресурсы
+
+	for range ticker.C {
+		if err := w.saveSnapshot(); err != nil {
+			log.Printf("snapshot creation failed: %v", err)
+		}
+	}
 }
 
 func (w *WAL) Close() error {
@@ -66,7 +81,7 @@ func (w *WAL) Write(command Command) (uint64, error) {
 			return 0, err
 		}
 	}
-	entry, err := NewEntry(uint64(len(w.index)), command)
+	entry, err := NewEntry(w.lastIdex+1, command)
 	if err != nil {
 		return 0, err
 	}
@@ -87,16 +102,14 @@ func (w *WAL) Write(command Command) (uint64, error) {
 		return 0, err
 	}
 	stat, _ := os.Stat(w.writer.Name())
-	w.index[uint64(len(w.index))] = position{offset, n, stat.Name()}
+	w.index[entry.Index] = position{offset, n, stat.Name()}
+	w.lastIdex++
 	return entry.Index, nil
 }
 
 func (w *WAL) Read(index uint64) (Command, error) {
-	w.mu.RLock()
-	defer w.mu.RUnlock()
-
-	if index >= uint64(len(w.index)) {
-		return Command{}, fmt.Errorf("invalid index, max index %d", uint64(len(w.index)))
+	if index >= w.lastIdex {
+		return Command{}, fmt.Errorf("invalid index, max index %d", w.lastIdex)
 	}
 	position := w.index[index]
 	buf := make([]byte, position.count)
@@ -125,24 +138,44 @@ func (w *WAL) Read(index uint64) (Command, error) {
 func (w *WAL) saveSnapshot() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	path := filepath.Join(w.direction, "snapshot")
 
-	files, err := os.ReadDir(w.direction)
-	if err != nil {
-		return errors.Wrap(err, "cant save snapshot")
-	}
-	var names []string
-	for _, file := range files {
-		names = append(names, file.Name())
-	}
-	sort.Strings(names)
-	state = make(map[string]string)
+	state := make(map[string]string)
 
-	for _, name := range names {
-		reader, err := os.OpenFile(filepath.Join(w.direction, name), os.O_RDONLY, 0664)
+	_, err := os.Stat(path)
+	if !os.IsNotExist(err) {
+		f, err := os.ReadFile(path)
 		if err != nil {
-			return errors.Wrap(err, "cant save snapshot")
+			return fmt.Errorf("error in reading snapshot, %w", err)
+		}
+		err = json.Unmarshal(f, &state)
+		if err != nil {
+			return fmt.Errorf("error in unmarshal snapshot, %w", err)
 		}
 	}
+
+	for i := w.snapshotIndex + 1; i <= w.lastIdex; i++ {
+		entity, _ := w.Read(i)
+
+		switch entity.Command {
+		case Insert:
+			state[entity.Property] = entity.Value
+		case Delete:
+			delete(state, entity.Property)
+		case Update:
+			state[entity.Property] = entity.Value
+		}
+	}
+	j, err := json.Marshal(state)
+	if err != nil {
+		return fmt.Errorf("error in serializing, %w", err)
+	}
+	err = os.WriteFile(path, j, 0644)
+	if err != nil {
+		return fmt.Errorf("error in saving snapshot file, %w", err)
+	}
+	w.snapshotIndex = w.lastIdex
+	return nil
 }
 
 func (w *WAL) rotate() error {

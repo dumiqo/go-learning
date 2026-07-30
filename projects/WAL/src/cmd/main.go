@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/rand/v2"
+	"time"
 	"wal/internal/testutil"
 	"wal/internal/wal"
 )
@@ -13,6 +14,7 @@ func main() {
 	if err != nil {
 		panic("Cant init WAL")
 	}
+	go w.StartPeriodicSnapshot(5 * time.Second)
 
 	count := 33_000
 	variables := 1_000
