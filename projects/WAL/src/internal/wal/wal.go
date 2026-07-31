@@ -29,17 +29,25 @@ type WAL struct {
 	direction, file string
 	writer, reader  *os.File
 
-	maxSize       int64
-	lastIdex      uint64
-	snapshotIndex uint64
+	maxSize  int64
+	lastIdex uint64
+	snaphot  Snapshot
 }
 
 func NewWal(dirPath, fileName string) *WAL {
-	return &WAL{make(map[uint64]position), sync.RWMutex{}, dirPath, fileName, nil, nil, 1024 * 1024, 0, 0}
+	return &WAL{make(map[uint64]position), sync.RWMutex{}, dirPath, fileName, nil, nil, 1024 * 1024, 0, Snapshot{0, make(map[string]string), filepath.Join(dirPath, fileName)}}
 }
 
 func (w *WAL) Init() error {
+
+	w.loadSnapshot()
+
 	filePath := filepath.Join(w.direction, w.file)
+	if w.snaphot.State != nil {
+		w.lastIdex = w.snaphot.Index + 1
+		filePath = w.snaphot.FilePath
+	}
+
 	writer, err := os.OpenFile(filePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return fmt.Errorf("open writer: %w", err)
@@ -135,38 +143,44 @@ func (w *WAL) Read(index uint64) (Command, error) {
 	return entry.Command, nil
 }
 
-func (w *WAL) saveSnapshot() error {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+func (w *WAL) loadSnapshot() error {
 	path := filepath.Join(w.direction, "snapshot")
-
-	state := make(map[string]string)
-
 	_, err := os.Stat(path)
 	if !os.IsNotExist(err) {
 		f, err := os.ReadFile(path)
 		if err != nil {
 			return fmt.Errorf("error in reading snapshot, %w", err)
 		}
-		err = json.Unmarshal(f, &state)
+		err = json.Unmarshal(f, &w.snaphot)
 		if err != nil {
 			return fmt.Errorf("error in unmarshal snapshot, %w", err)
 		}
 	}
+	return nil
+}
 
-	for i := w.snapshotIndex + 1; i <= w.lastIdex; i++ {
+func (w *WAL) saveSnapshot() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	path := filepath.Join(w.direction, "snapshot")
+
+	w.loadSnapshot()
+
+	for i := w.snaphot.Index + 1; i <= w.lastIdex; i++ {
 		entity, _ := w.Read(i)
 
 		switch entity.Command {
 		case Insert:
-			state[entity.Property] = entity.Value
+			w.snaphot.State[entity.Property] = entity.Value
 		case Delete:
-			delete(state, entity.Property)
+			delete(w.snaphot.State, entity.Property)
 		case Update:
-			state[entity.Property] = entity.Value
+			w.snaphot.State[entity.Property] = entity.Value
 		}
 	}
-	j, err := json.Marshal(state)
+	w.snaphot.Index = w.lastIdex
+	w.snaphot.FilePath = w.writer.Name()
+	j, err := json.Marshal(w.snaphot)
 	if err != nil {
 		return fmt.Errorf("error in serializing, %w", err)
 	}
@@ -174,7 +188,6 @@ func (w *WAL) saveSnapshot() error {
 	if err != nil {
 		return fmt.Errorf("error in saving snapshot file, %w", err)
 	}
-	w.snapshotIndex = w.lastIdex
 	return nil
 }
 
