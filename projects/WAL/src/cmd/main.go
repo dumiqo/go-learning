@@ -16,8 +16,8 @@ func main() {
 	}
 	go w.StartPeriodicSnapshot(5 * time.Second)
 
-	count := 3_333_000
-	variables := 3_000
+	count := 1_000_000
+	variables := 1_000
 	commands := testutil.GenerateTestCommand(count, variables)
 	for _, commad := range commands {
 		w.Write(commad)

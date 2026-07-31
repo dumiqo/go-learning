@@ -32,10 +32,12 @@ type WAL struct {
 	maxSize  int64
 	lastIdex uint64
 	snaphot  Snapshot
+
+	fileToDelete []string
 }
 
 func NewWal(dirPath, fileName string) *WAL {
-	return &WAL{make(map[uint64]position), sync.RWMutex{}, dirPath, fileName, nil, nil, 1024 * 1024, 0, Snapshot{0, make(map[string]string), filepath.Join(dirPath, fileName)}}
+	return &WAL{make(map[uint64]position), sync.RWMutex{}, dirPath, fileName, nil, nil, 1024 * 1024, 0, Snapshot{0, make(map[string]string), filepath.Join(dirPath, fileName)}, make([]string, 0)}
 }
 
 func (w *WAL) Init() error {
@@ -188,13 +190,19 @@ func (w *WAL) saveSnapshot() error {
 	if err != nil {
 		return fmt.Errorf("error in saving snapshot file, %w", err)
 	}
+	for _, f := range w.fileToDelete {
+		os.Remove(filepath.Join(w.direction, f))
+	}
+	w.fileToDelete = make([]string, 0)
 	return nil
 }
 
 func (w *WAL) rotate() error {
 	stat, _ := os.Stat(w.writer.Name())
+	currentName := stat.Name()
+	w.fileToDelete = append(w.fileToDelete, currentName)
 
-	newFileName := newFileName(stat.Name(), w.file)
+	newFileName := newFileName(currentName, w.file)
 	filePath := filepath.Join(w.direction, newFileName)
 	writer, err := os.OpenFile(filePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
