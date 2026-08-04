@@ -19,10 +19,10 @@ func NewCache() (*Cache, error) {
 	return &Cache{sync.RWMutex{}, make(map[string]cacheItem)}, nil
 }
 
-func (c *Cache) Set(key, value string) error {
+func (c *Cache) Set(key, value string, ttl time.Time) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.items[key] = cacheItem{value, time.Now()}
+	c.items[key] = cacheItem{value, ttl}
 	return nil
 }
 
