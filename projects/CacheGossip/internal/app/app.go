@@ -36,6 +36,9 @@ func Run(cfg *config.Config) {
 	r.Use(middleware.Timeout(60 * time.Second))
 
 	r.Get("/health", client.Health)
+	r.Get("/objects/{key}", client.Get)
+	r.Post("/objects/", client.Post)
+	r.Delete("/objects/{key}", client.Delete)
 
 	clientServer := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Http.Port),
