@@ -1,0 +1,60 @@
+services:
+  first:
+    container_name: first
+    platform: linux/amd64
+    build:
+      context: .
+    environment:
+      APP_NAME: "first"
+      HTTP_PORT: "8080"
+      SEEDNODES_URLS: '["third:8080","second:8080"]'
+    ports:
+      - "8081:8080"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: '1Gb'
+        reservations:
+          cpus: '0.60'
+          memory: '1Gb'
+
+  second:
+    container_name: second
+    platform: linux/amd64
+    build:
+      context: .
+    environment:
+      APP_NAME: "second"
+      HTTP_PORT: "8080"
+      SEEDNODES_URLS: '["first:8080","third:8080"]'
+    ports:
+      - "8082:8080"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: '1Gb'
+        reservations:
+          cpus: '0.60'
+          memory: '1Gb'  
+
+  third:
+    container_name: third
+    platform: linux/amd64
+    build:
+      context: .
+    environment:
+      APP_NAME: "third"
+      HTTP_PORT: "8080"
+      SEEDNODES_URLS: '["first:8080","second:8080"]'
+    ports:
+      - "8083:8080"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: '1Gb'
+        reservations:
+          cpus: '0.60'
+          memory: '1Gb'  
