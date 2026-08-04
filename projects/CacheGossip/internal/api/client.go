@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -34,18 +35,25 @@ func (c *ClientApi) Post(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Key   string `json:"key"`
 		Value string `json:"value"`
+		TTL   string `json:"ttl"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.SendError(w, c.Name, http.StatusBadRequest,
 			fmt.Errorf("invalid request body"))
 		return
 	}
-	err := c.cache.Set(req.Key, req.Value)
+	ttl, err := time.ParseDuration(req.TTL)
 	if err != nil {
 		response.SendError(w, c.Name, 400, err)
-	} else {
-		response.SendOK(w, c.Name, "Success")
+		return
 	}
+	err = c.cache.Set(req.Key, req.Value, time.Now().Add(ttl))
+	if err != nil {
+		response.SendError(w, c.Name, 400, err)
+		return
+	}
+	response.SendOK(w, c.Name, "Success")
+
 }
 func (c *ClientApi) Get(w http.ResponseWriter, r *http.Request) {
 	key := chi.URLParam(r, "key")
@@ -53,7 +61,7 @@ func (c *ClientApi) Get(w http.ResponseWriter, r *http.Request) {
 	if !exist {
 		response.SendOK(w, c.Name, "not found")
 	} else {
-		response.SendOK(w, c.Name, v)
+		response.SendOK(w, c.Name, map[string]string{"Value": v})
 	}
 }
 func (c *ClientApi) Delete(w http.ResponseWriter, r *http.Request) {
