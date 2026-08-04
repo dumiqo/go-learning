@@ -11,11 +11,11 @@ type Logger struct {
 	log zerolog.Logger
 }
 
-func NewLogger(name *string) (*Logger, error) {
-	if name == nil {
+func NewLogger(name string) (*Logger, error) {
+	if name == "" {
 		return nil, fmt.Errorf("Name is empty")
 	}
-	l := zerolog.New(os.Stdout).With().Timestamp().Str("NodeName", *name).Logger()
+	l := zerolog.New(os.Stdout).With().Timestamp().Str("NodeName", name).Logger()
 	return &Logger{l}, nil
 }
 

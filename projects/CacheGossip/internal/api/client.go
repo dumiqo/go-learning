@@ -2,21 +2,20 @@ package api
 
 import (
 	"CacheGossip/internal/cache"
-	"CacheGossip/pgk/logger"
-	"encoding/json"
+	"CacheGossip/pkg/logger"
+	"CacheGossip/pkg/response"
 	"fmt"
 	"net/http"
-	"time"
 )
 
 type ClientApi struct {
-	Name   *string
+	Name   string
 	cache  *cache.Cache
 	logger *logger.Logger
 }
 
-func NewClientApi(name *string, cache *cache.Cache, logger *logger.Logger) (*ClientApi, error) {
-	if name == nil {
+func NewClientApi(name string, cache *cache.Cache, logger *logger.Logger) (*ClientApi, error) {
+	if name == "" {
 		return nil, fmt.Errorf("Name cannot be empty")
 	}
 	if cache == nil {
@@ -26,22 +25,5 @@ func NewClientApi(name *string, cache *cache.Cache, logger *logger.Logger) (*Cli
 }
 
 func (c *ClientApi) Health(w http.ResponseWriter, r *http.Request) {
-	c.logger.Info("Health check")
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Устанавливаем заголовок
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	// Отправляем JSON ответ
-	response := map[string]interface{}{
-		"status":    "ok",
-		"timestamp": time.Now().Format(time.RFC3339),
-		"service":   "CacheGossip",
-	}
-
-	json.NewEncoder(w).Encode(response)
+	response.SendOK(w, c.Name, map[string]string{"status": "ok"})
 }

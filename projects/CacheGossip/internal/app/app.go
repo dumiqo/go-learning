@@ -4,7 +4,8 @@ import (
 	"CacheGossip/config"
 	"CacheGossip/internal/api"
 	"CacheGossip/internal/cache"
-	"CacheGossip/pgk/logger"
+	"CacheGossip/pkg/logger"
+	myMiddleware "CacheGossip/pkg/middleware"
 	"context"
 	"fmt"
 	"net/http"
@@ -12,21 +13,33 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
+type servers struct {
+	client *http.Server
+	gossip *http.Server
+}
+
 func Run(cfg *config.Config) {
-	logger, _ := logger.NewLogger(&cfg.App.Name)
-
+	logger, _ := logger.NewLogger(cfg.App.Name)
 	cache, _ := cache.NewCache()
-	client, _ := api.NewClientApi(&cfg.App.Name, cache, logger)
+	client, _ := api.NewClientApi(cfg.App.Name, cache, logger)
 
-	clientMux := http.NewServeMux()
+	r := chi.NewRouter()
 
-	clientMux.HandleFunc("/health", client.Health)
+	r.Use(myMiddleware.LoggerMiddleware(logger))
+	r.Use(middleware.Recoverer)
+	r.Use(myMiddleware.JSONMiddleware)
+	r.Use(middleware.Timeout(60 * time.Second))
+
+	r.Get("/health", client.Health)
 
 	clientServer := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Http.Port),
-		Handler:      clientMux,
+		Handler:      r,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}
