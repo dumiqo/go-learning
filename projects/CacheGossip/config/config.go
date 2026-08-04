@@ -16,7 +16,7 @@ type (
 		Name string `env:"APP_NAME,required"`
 	}
 	http struct {
-		Port string `env:"HTTP_PORT,required"`
+		Port int `env:"HTTP_PORT,required"`
 	}
 	gossip struct {
 		Port string `env:"GOSSIP_PORT,required"`
