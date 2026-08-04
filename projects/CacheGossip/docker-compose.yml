@@ -7,7 +7,8 @@ services:
     environment:
       APP_NAME: "first"
       HTTP_PORT: "8080"
-      SEEDNODES_URLS: '["third:8080","second:8080"]'
+      GOSSIP_PORT: "8081"
+      SEEDNODES_URLS: '["third","second"]'
     ports:
       - "8081:8080"
     deploy:
@@ -27,7 +28,8 @@ services:
     environment:
       APP_NAME: "second"
       HTTP_PORT: "8080"
-      SEEDNODES_URLS: '["first:8080","third:8080"]'
+      GOSSIP_PORT: "8081"
+      SEEDNODES_URLS: '["first","third"]'
     ports:
       - "8082:8080"
     deploy:
@@ -47,7 +49,8 @@ services:
     environment:
       APP_NAME: "third"
       HTTP_PORT: "8080"
-      SEEDNODES_URLS: '["first:8080","second:8080"]'
+      GOSSIP_PORT: "8081"
+      SEEDNODES_URLS: '["first","second"]'
     ports:
       - "8083:8080"
     deploy:

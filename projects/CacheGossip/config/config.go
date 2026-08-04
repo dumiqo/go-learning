@@ -18,6 +18,9 @@ type (
 	http struct {
 		Port string `env:"HTTP_PORT,required"`
 	}
+	gossip struct {
+		Port string `env:"GOSSIP_PORT,required"`
+	}
 	seedNodes struct {
 		Urls []string `env:"SEEDNODES_URLS,required"`
 	}
