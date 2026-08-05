@@ -36,9 +36,11 @@ func Run(cfg *config.Config) {
 	r.Use(middleware.Timeout(60 * time.Second))
 
 	r.Get("/health", client.Health)
-	r.Get("/objects/{key}", client.Get)
-	r.Post("/objects/", client.Post)
-	r.Delete("/objects/{key}", client.Delete)
+	r.Route("/objects", func(r chi.Router) {
+		r.Post("/", client.Post)
+		r.Delete("/{key}", client.Delete)
+		r.Get("/{key}", client.Get)
+	})
 
 	clientServer := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Http.Port),
