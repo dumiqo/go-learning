@@ -23,11 +23,10 @@ type (
 		Port string `env:"GOSSIP_PORT,required"`
 	}
 	seedNodes struct {
-		Nodes map[string]string `env:"SEEDNODES_NODES,required"`
+		NodesRaw string `env:"SEEDNODES_NODES,required"`
 	}
 )
 
-// NewConfig returns app config.
 func NewConfig() (*Config, error) {
 	cfg := &Config{}
 	if err := env.Parse(cfg); err != nil {

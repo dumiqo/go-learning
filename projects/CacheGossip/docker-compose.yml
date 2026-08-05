@@ -8,7 +8,7 @@ services:
       APP_NAME: "first"
       HTTP_PORT: "8080"
       GOSSIP_PORT: "8081"
-      SEEDNODES_NODES: '{"second":"second:8081","third":"third:8081"}'
+      SEEDNODES_NODES: '{"second":"http://second:8081/gossip","third":"http://third:8081/gossip"}'
     ports:
       - "8081:8080"
       - "8181:8081"
@@ -30,7 +30,7 @@ services:
       APP_NAME: "second"
       HTTP_PORT: "8080"
       GOSSIP_PORT: "8081"
-      SEEDNODES_NODES: '{"first":"first:8081","third":"third:8081"}'
+      SEEDNODES_NODES: '{"first":"http://first:8081/gossip","third":"http://third:8081/gossip"}'
     ports:
       - "8082:8080"
       - "8182:8081"
@@ -52,7 +52,7 @@ services:
       APP_NAME: "third"
       HTTP_PORT: "8080"
       GOSSIP_PORT: "8081"
-      SEEDNODES_NODES: '{"second":"second:8081","first":"first:8081"}'
+      SEEDNODES_NODES: '{"second":"http://second:8081/gossip","first":"http://first:8081/gossip"}'
     ports:
       - "8083:8080"
       - "8183:8081"

@@ -1,7 +1,6 @@
 package models
 
 import (
-	"CacheGossip/pkg/models"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -25,10 +24,10 @@ type GossipMessage struct {
 }
 
 type NodeInfo struct {
-	Name     string        `json:"name"`
-	Status   models.Status `json:"status"`
-	Address  string        `json:"address"`
-	LastSeen time.Time     `json:"last_seen"`
+	Name     string    `json:"name"`
+	Status   Status    `json:"status"`
+	Address  string    `json:"address"`
+	LastSeen time.Time `json:"last_seen"`
 }
 
 func (r *GossipMessage) Validate() error {

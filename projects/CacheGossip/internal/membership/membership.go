@@ -9,27 +9,23 @@ import (
 )
 
 type Membership struct {
-	members map[string]member
+	members map[string]Member
 }
 
-type member struct {
-	name    string
-	url     string
-	status  models.Status
-	history []history
+type Member struct {
+	Name    string
+	Url     string
+	Status  models.Status
+	History []history
 }
 type history struct {
 	uuid uuid.UUID
 	time time.Time
 }
 
-func (m *Membership) autoNotifyMember() {
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-	for range ticker.C {
-		key := m.randomMemberKey()
-		member := m.members[key]
-	}
+func (m *Membership) RandomMember() Member {
+	key := m.randomMemberKey()
+	return m.members[key]
 }
 
 func (m *Membership) randomMemberKey() string {
@@ -42,12 +38,9 @@ func (m *Membership) randomMemberKey() string {
 }
 
 func NewMembership(hosts map[string]string) *Membership {
-	members := make(map[string]member)
+	members := make(map[string]Member)
 	for k, v := range hosts {
-		members[k] = member{k, v, models.Suspect, make([]history, 10)}
+		members[k] = Member{k, v, models.Suspect, make([]history, 10)}
 	}
-	m := Membership{members}
-	go m.autoNotifyMember()
-
-	return &m
+	return &Membership{members}
 }

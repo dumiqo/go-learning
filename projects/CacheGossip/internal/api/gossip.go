@@ -1,7 +1,7 @@
 package api
 
 import (
-	"CacheGossip/internal/membership"
+	"CacheGossip/internal/gossip"
 	"CacheGossip/pkg/logger"
 	"CacheGossip/pkg/models"
 	"CacheGossip/pkg/response"
@@ -11,12 +11,12 @@ import (
 )
 
 type GossipApi struct {
-	Name       string
-	Membership *membership.Membership
-	logger     *logger.Logger
+	Name   string
+	gossip *gossip.Gossip
+	logger *logger.Logger
 }
 
-func NewGossipApi(name string, membersip *membership.Membership, logger *logger.Logger) *GossipApi {
+func NewGossipApi(name string, membersip *gossip.Gossip, logger *logger.Logger) *GossipApi {
 	return &GossipApi{name, membersip, logger}
 }
 
@@ -35,6 +35,5 @@ func (g *GossipApi) Gossip(w http.ResponseWriter, r *http.Request) {
 		response.SendError(w, g.Name, http.StatusBadRequest, err)
 		return
 	}
-	g.Membership.
-		response.SendOK(w, g.Name, map[string]string{"status": "ok"})
+	g.logger.Info("!!!!!!!!!!!!! gossip !!!!!!!!!!!!!")
 }

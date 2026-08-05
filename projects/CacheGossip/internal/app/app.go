@@ -4,10 +4,12 @@ import (
 	"CacheGossip/config"
 	"CacheGossip/internal/api"
 	"CacheGossip/internal/cache"
+	"CacheGossip/internal/gossip"
 	"CacheGossip/internal/membership"
 	"CacheGossip/pkg/logger"
 	myMiddleware "CacheGossip/pkg/middleware"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -24,16 +26,19 @@ type servers struct {
 	gossip *http.Server
 }
 type services struct {
-	logger     *logger.Logger
-	cache      *cache.Cache
-	membership *membership.Membership
+	logger *logger.Logger
+	cache  *cache.Cache
+	gossip *gossip.Gossip
 }
 
 func initServices(cfg config.Config) services {
 	logger, _ := logger.NewLogger(cfg.App.Name)
 	cache, _ := cache.NewCache(logger)
-	membersip := membership.NewMembership(cfg.SeedNodes.Nodes)
-	return services{logger, cache, membersip}
+	var nodes map[string]string
+	json.Unmarshal([]byte(cfg.SeedNodes.NodesRaw), &nodes)
+	membersip := membership.NewMembership(nodes)
+	gossip := gossip.NewGossip(cfg.App.Name, membersip, logger)
+	return services{logger, cache, gossip}
 }
 
 func initServers(src services, cfg config.Config) servers {
@@ -41,7 +46,7 @@ func initServers(src services, cfg config.Config) servers {
 }
 
 func initGossip(src services, cfg config.Config) *http.Server {
-	client := api.NewGossipApi(cfg.App.Name, src.membership, src.logger)
+	client := api.NewGossipApi(cfg.App.Name, src.gossip, src.logger)
 	r := chi.NewRouter()
 
 	r.Use(myMiddleware.LoggerMiddleware(src.logger))
@@ -108,13 +113,18 @@ func Run(cfg *config.Config) {
 
 	services := initServices(*cfg)
 	servers := initServers(services, *cfg)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go services.gossip.Start(ctx)
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
 	services.logger.Info("Shutting down...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	cancel()
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	services.cache.Stop()
