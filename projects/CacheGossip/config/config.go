@@ -9,6 +9,7 @@ import (
 type (
 	Config struct {
 		Http      http
+		Gossip    gossip
 		SeedNodes seedNodes
 		App       app
 	}
@@ -22,7 +23,7 @@ type (
 		Port string `env:"GOSSIP_PORT,required"`
 	}
 	seedNodes struct {
-		Urls []string `env:"SEEDNODES_URLS,required"`
+		Nodes map[string]string `env:"SEEDNODES_NODES,required"`
 	}
 )
 

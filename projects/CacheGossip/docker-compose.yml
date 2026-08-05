@@ -8,9 +8,10 @@ services:
       APP_NAME: "first"
       HTTP_PORT: "8080"
       GOSSIP_PORT: "8081"
-      SEEDNODES_URLS: '["third","second"]'
+      SEEDNODES_NODES: '{"second":"second:8081","third":"third:8081"}'
     ports:
       - "8081:8080"
+      - "8181:8081"
     deploy:
       resources:
         limits:
@@ -29,9 +30,10 @@ services:
       APP_NAME: "second"
       HTTP_PORT: "8080"
       GOSSIP_PORT: "8081"
-      SEEDNODES_URLS: '["first","third"]'
+      SEEDNODES_NODES: '{"first":"first:8081","third":"third:8081"}'
     ports:
       - "8082:8080"
+      - "8182:8081"
     deploy:
       resources:
         limits:
@@ -50,9 +52,10 @@ services:
       APP_NAME: "third"
       HTTP_PORT: "8080"
       GOSSIP_PORT: "8081"
-      SEEDNODES_URLS: '["first","second"]'
+      SEEDNODES_NODES: '{"second":"second:8081","first":"first:8081"}'
     ports:
       - "8083:8080"
+      - "8183:8081"
     deploy:
       resources:
         limits:

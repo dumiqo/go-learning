@@ -4,6 +4,7 @@ import (
 	"CacheGossip/config"
 	"CacheGossip/internal/api"
 	"CacheGossip/internal/cache"
+	"CacheGossip/internal/membership"
 	"CacheGossip/pkg/logger"
 	myMiddleware "CacheGossip/pkg/middleware"
 	"context"
@@ -22,15 +23,58 @@ type servers struct {
 	client *http.Server
 	gossip *http.Server
 }
+type services struct {
+	logger     *logger.Logger
+	cache      *cache.Cache
+	membership *membership.Membership
+}
 
-func Run(cfg *config.Config) {
+func initServices(cfg config.Config) services {
 	logger, _ := logger.NewLogger(cfg.App.Name)
 	cache, _ := cache.NewCache(logger)
-	client, _ := api.NewClientApi(cfg.App.Name, cache, logger)
+	membersip := membership.NewMembership(cfg.SeedNodes.Nodes)
+	return services{logger, cache, membersip}
+}
+
+func initServers(src services, cfg config.Config) servers {
+	return servers{initClientApi(src, cfg), initGossip(src, cfg)}
+}
+
+func initGossip(src services, cfg config.Config) *http.Server {
+	client := api.NewGossipApi(cfg.App.Name, src.membership, src.logger)
+	r := chi.NewRouter()
+
+	r.Use(myMiddleware.LoggerMiddleware(src.logger))
+	r.Use(middleware.Recoverer)
+	r.Use(myMiddleware.JSONMiddleware)
+	r.Use(middleware.Timeout(60 * time.Second))
+
+	r.Get("/health", client.Health)
+	r.Post("/gossip", client.Gossip)
+
+	clientServer := &http.Server{
+		Addr:         fmt.Sprintf(":%d", cfg.Gossip.Port),
+		Handler:      r,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+	}
+
+	go func() {
+		src.logger.Info("Starting gossip API server")
+		if err := clientServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			src.logger.Error("Failed to start gossip server")
+		}
+	}()
+
+	return clientServer
+}
+
+func initClientApi(src services, cfg config.Config) *http.Server {
+	client, _ := api.NewClientApi(cfg.App.Name, src.cache, src.logger)
 
 	r := chi.NewRouter()
 
-	r.Use(myMiddleware.LoggerMiddleware(logger))
+	r.Use(myMiddleware.LoggerMiddleware(src.logger))
 	r.Use(middleware.Recoverer)
 	r.Use(myMiddleware.JSONMiddleware)
 	r.Use(middleware.Timeout(60 * time.Second))
@@ -51,22 +95,31 @@ func Run(cfg *config.Config) {
 	}
 
 	go func() {
-		logger.Info("Starting client API server")
+		src.logger.Info("Starting client API server")
 		if err := clientServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Error("Failed to start client server")
+			src.logger.Error("Failed to start client server")
 		}
 	}()
+
+	return clientServer
+}
+
+func Run(cfg *config.Config) {
+
+	services := initServices(*cfg)
+	servers := initServers(services, *cfg)
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
-	logger.Info("Shutting down...")
+	services.logger.Info("Shutting down...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	cache.Stop()
-	clientServer.Shutdown(ctx)
+	services.cache.Stop()
+	servers.client.Shutdown(ctx)
+	servers.gossip.Shutdown(ctx)
 
-	logger.Info("Shutdown copleate")
+	services.logger.Info("Shutdown copleate")
 }
