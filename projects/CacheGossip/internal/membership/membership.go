@@ -2,6 +2,7 @@ package membership
 
 import (
 	"CacheGossip/pkg/models"
+	"context"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -20,6 +21,29 @@ type member struct {
 	LastSeen time.Time
 }
 
+func (m *Membership) Start(ctx context.Context) error {
+
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			m.updateStatus()
+		case <-ctx.Done():
+			return nil
+		}
+	}
+}
+
+func (m *Membership) updateStatus() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for k, v := range m.members {
+		v.Status = models.NewStatus(v.LastSeen)
+		m.members[k] = v
+	}
+}
 func (m *Membership) UpdateStatus(name string, time time.Time) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
