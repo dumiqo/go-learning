@@ -67,7 +67,7 @@ func initGossip(src services, cfg config.Config) *http.Server {
 	go func() {
 		src.logger.Info("Starting gossip API server")
 		if err := clientServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			src.logger.Error("Failed to start gossip server")
+			src.logger.Error("Failed to start gossip server. %s", err)
 		}
 	}()
 

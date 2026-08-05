@@ -20,7 +20,7 @@ type (
 		Port int `env:"HTTP_PORT,required"`
 	}
 	gossip struct {
-		Port string `env:"GOSSIP_PORT,required"`
+		Port int `env:"GOSSIP_PORT,required"`
 	}
 	seedNodes struct {
 		NodesRaw string `env:"SEEDNODES_NODES,required"`
