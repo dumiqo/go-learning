@@ -73,3 +73,6 @@ func (c *ClientApi) Delete(w http.ResponseWriter, r *http.Request) {
 		response.SendOK(w, c.Name, "Success")
 	}
 }
+func (c *ClientApi) Status(w http.ResponseWriter, r *http.Request) {
+	response.SendOK(w, c.Name, c.cache.Stat())
+}

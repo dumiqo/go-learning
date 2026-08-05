@@ -1,13 +1,22 @@
 package cache
 
 import (
+	"CacheGossip/pkg/logger"
 	"sync"
 	"time"
 )
 
 type Cache struct {
-	mu    sync.RWMutex
-	items map[string]cacheItem
+	mu       sync.RWMutex
+	log      *logger.Logger
+	items    map[string]cacheItem
+	stopChan chan int
+
+	miss, hit int
+}
+
+type CacheStat struct {
+	Count, Miss, Hit int
 }
 
 type cacheItem struct {
@@ -15,8 +24,51 @@ type cacheItem struct {
 	ttl   time.Time
 }
 
-func NewCache() (*Cache, error) {
-	return &Cache{sync.RWMutex{}, make(map[string]cacheItem)}, nil
+func (c *Cache) autoClean() {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			c.cleanExpired()
+		case <-c.stopChan:
+			return // ← корректное завершение
+		}
+	}
+}
+func (c *Cache) cleanExpired() {
+	c.log.Info("Start autoclean")
+	c.mu.RLock()
+	now := time.Now()
+	toDelete := make([]string, 0, 100)
+
+	for k, v := range c.items {
+		if now.After(v.ttl) {
+			toDelete = append(toDelete, k)
+		}
+		if len(toDelete) >= 100 {
+			break
+		}
+	}
+	c.mu.RUnlock()
+
+	c.log.Info("Items to delete: %d", len(toDelete))
+	if len(toDelete) > 0 {
+		c.mu.Lock()
+		for _, k := range toDelete {
+			delete(c.items, k)
+		}
+		c.mu.Unlock()
+	}
+	c.log.Info("End autoclean")
+}
+
+func NewCache(logger *logger.Logger) (*Cache, error) {
+	c := Cache{sync.RWMutex{}, logger, make(map[string]cacheItem), make(chan int), 0, 0}
+
+	go c.autoClean()
+
+	return &c, nil
 }
 
 func (c *Cache) Set(key, value string, ttl time.Time) error {
@@ -41,11 +93,21 @@ func (c *Cache) Get(key string) (string, bool) {
 	item, exist := c.items[key]
 
 	if !exist {
+		c.miss++
 		return "", false
 	}
 	if time.Now().After(item.ttl) {
 		delete(c.items, key)
 		return "", false
 	}
+	c.hit++
 	return item.value, true
+}
+
+func (c *Cache) Stop() {
+	close(c.stopChan) // останавливаем горутину
+}
+
+func (c *Cache) Stat() CacheStat {
+	return CacheStat{len(c.items), c.miss, c.hit}
 }

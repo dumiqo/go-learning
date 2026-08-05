@@ -25,7 +25,7 @@ type servers struct {
 
 func Run(cfg *config.Config) {
 	logger, _ := logger.NewLogger(cfg.App.Name)
-	cache, _ := cache.NewCache()
+	cache, _ := cache.NewCache(logger)
 	client, _ := api.NewClientApi(cfg.App.Name, cache, logger)
 
 	r := chi.NewRouter()
@@ -36,10 +36,11 @@ func Run(cfg *config.Config) {
 	r.Use(middleware.Timeout(60 * time.Second))
 
 	r.Get("/health", client.Health)
-	r.Route("/objects", func(r chi.Router) {
+	r.Route("/cache", func(r chi.Router) {
 		r.Post("/", client.Post)
 		r.Delete("/{key}", client.Delete)
 		r.Get("/{key}", client.Get)
+		r.Get("/status", client.Status)
 	})
 
 	clientServer := &http.Server{
@@ -63,6 +64,8 @@ func Run(cfg *config.Config) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
+	cache.Stop()
 	clientServer.Shutdown(ctx)
 
 	logger.Info("Shutdown copleate")
