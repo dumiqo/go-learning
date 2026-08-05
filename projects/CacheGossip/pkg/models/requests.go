@@ -48,11 +48,13 @@ func (r *GossipMessage) ToJSON() ([]byte, error) {
 func (r *GossipMessage) FromJSON(data []byte) error {
 	return json.Unmarshal(data, r)
 }
-func NewMembershipGossip(name string) GossipMessage {
+func NewMembershipGossip(name string, nodes []NodeInfo) GossipMessage {
 	return GossipMessage{
 		Sender: name,
 		UUID:   uuid.New(),
 		Time:   time.Now().UTC(),
 		Type:   Membership,
+
+		Nodes: nodes,
 	}
 }

@@ -2,28 +2,80 @@ package membership
 
 import (
 	"CacheGossip/pkg/models"
+	"fmt"
 	"math/rand"
+	"sync"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 type Membership struct {
-	members map[string]Member
+	members map[string]member
+	mu      sync.RWMutex
 }
 
-type Member struct {
-	Name    string
-	Url     string
-	Status  models.Status
-	History []history
-}
-type history struct {
-	uuid uuid.UUID
-	time time.Time
+type member struct {
+	Name     string
+	Url      string
+	Status   models.Status
+	LastSeen time.Time
 }
 
-func (m *Membership) RandomMember() Member {
+func (m *Membership) UpdateStatus(name string, time time.Time) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	member, exists := m.members[name]
+	if !exists {
+		return fmt.Errorf("node %s not found", name)
+	}
+
+	member.LastSeen = time
+	member.Status = models.NewStatus(time)
+
+	m.members[name] = member
+
+	return nil
+}
+func (m *Membership) Update(node models.NodeInfo) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	member, exists := m.members[node.Name]
+	if !exists {
+		return fmt.Errorf("node %s not found", node.Name)
+	}
+
+	if member.Name == node.Name {
+		if node.LastSeen.Before(member.LastSeen) {
+			return fmt.Errorf("Cannot update node")
+		}
+		m.members[node.Name] = newMember(node)
+	}
+
+	return nil
+}
+
+func newMember(node models.NodeInfo) member {
+	return member{node.Name, node.Address, node.Status, node.LastSeen}
+}
+
+func (m *member) toNodeInfo() models.NodeInfo {
+	return models.NodeInfo{Name: m.Name, Status: m.Status, Address: m.Url, LastSeen: m.LastSeen}
+}
+
+func (m *Membership) GetNodeInfo() []models.NodeInfo {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	nodes := make([]models.NodeInfo, 0, len(m.members))
+
+	for _, m := range m.members {
+		nodes = append(nodes, m.toNodeInfo())
+	}
+
+	return nodes
+}
+
+func (m *Membership) RandomMember() member {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	key := m.randomMemberKey()
 	return m.members[key]
 }
@@ -38,9 +90,9 @@ func (m *Membership) randomMemberKey() string {
 }
 
 func NewMembership(hosts map[string]string) *Membership {
-	members := make(map[string]Member)
+	members := make(map[string]member)
 	for k, v := range hosts {
-		members[k] = Member{k, v, models.Suspect, make([]history, 10)}
+		members[k] = member{k, v, models.Suspect, time.Time{}}
 	}
-	return &Membership{members}
+	return &Membership{members, sync.RWMutex{}}
 }

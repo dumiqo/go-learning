@@ -25,15 +25,18 @@ func (g *GossipApi) Health(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *GossipApi) Gossip(w http.ResponseWriter, r *http.Request) {
-	var req models.GossipMessage
+	var msg models.GossipMessage
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&msg); err != nil {
 		response.SendError(w, g.Name, http.StatusBadRequest, fmt.Errorf("invalid request body %s", err))
 		return
 	}
-	if err := req.Validate(); err != nil {
+	if err := msg.Validate(); err != nil {
 		response.SendError(w, g.Name, http.StatusBadRequest, err)
 		return
 	}
-	g.logger.Info("!!!!!!!!!!!!! gossip !!!!!!!!!!!!!")
+	if err := g.gossip.ProcessGossip(msg); err != nil {
+		response.SendError(w, g.Name, http.StatusBadRequest, err)
+		return
+	}
 }

@@ -35,10 +35,30 @@ func (g *Gossip) Start(ctx context.Context) {
 	}
 }
 
+func (g *Gossip) ProcessGossip(msg models.GossipMessage) error {
+	g.logger.Info("Begin processiong gossip from: %s. uuid: %s", msg.Sender, msg.UUID)
+	for _, node := range msg.Nodes {
+		if g.nodeName == node.Name {
+			continue
+		}
+
+		if err := g.membership.Update(node); err != nil {
+			g.logger.Error("Error in updating membership. member: %s. %s", node.Name, err)
+		}
+		g.logger.Info("Update member, %s", node.Name)
+	}
+
+	if err := g.membership.UpdateStatus(msg.Sender, msg.Time); err != nil {
+		g.logger.Error("Error in updating membership. member: %s. %s", msg.Sender, err)
+	}
+	g.logger.Info("End in processiong gossip from: %s. uuid: %s", msg.Sender, msg.UUID)
+	return nil
+}
+
 func (g *Gossip) sendGossip() {
 	member := g.membership.RandomMember()
 
-	msg := models.NewMembershipGossip(g.nodeName)
+	msg := models.NewMembershipGossip(g.nodeName, g.membership.GetNodeInfo())
 
 	json, err := msg.ToJSON()
 

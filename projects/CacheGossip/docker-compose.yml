@@ -76,8 +76,8 @@ services:
       GOSSIP_PORT: "8081"
       SEEDNODES_NODES: '{"second":"http://second:8081/gossip","first":"http://first:8081/gossip","third":"http://third:8081/gossip","fifth":"http://fifth:8081/gossip"}'
     ports:
-      - "8083:8080"
-      - "8183:8081"
+      - "8084:8080"
+      - "8184:8081"
     deploy:
       resources:
         limits:
@@ -98,8 +98,8 @@ services:
       GOSSIP_PORT: "8081"
       SEEDNODES_NODES: '{"second":"http://second:8081/gossip","first":"http://first:8081/gossip","third":"http://third:8081/gossip","for":"http://for:8081/gossip"}'
     ports:
-      - "8083:8080"
-      - "8183:8081"
+      - "8085:8080"
+      - "8185:8081"
     deploy:
       resources:
         limits:

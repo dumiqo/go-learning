@@ -1,5 +1,7 @@
 package models
 
+import "time"
+
 type Status int
 
 const (
@@ -19,4 +21,15 @@ func (s Status) String() string {
 	default:
 		return "unknown"
 	}
+}
+
+func NewStatus(t time.Time) Status {
+	elapsed := time.Now().UTC().Sub(t.UTC())
+	if elapsed.Seconds() <= 20 {
+		return Alive
+	}
+	if elapsed.Minutes() <= 1 {
+		return Suspect
+	}
+	return Dead
 }
