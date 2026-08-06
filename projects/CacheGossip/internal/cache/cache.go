@@ -2,6 +2,7 @@ package cache
 
 import (
 	"CacheGossip/pkg/logger"
+	"CacheGossip/pkg/models"
 	"context"
 	"sync"
 	"time"
@@ -105,5 +106,8 @@ func (c *Cache) Get(key string) (string, bool) {
 }
 
 func (c *Cache) Stat() CacheStat {
+	return CacheStat{len(c.items), c.miss, c.hit}
+}
+func (c *Cache) GetPendingOperations() []models.PendingOperation {
 	return CacheStat{len(c.items), c.miss, c.hit}
 }

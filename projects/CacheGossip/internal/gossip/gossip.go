@@ -1,6 +1,7 @@
 package gossip
 
 import (
+	"CacheGossip/internal/cache"
 	"CacheGossip/internal/membership"
 	"CacheGossip/pkg/logger"
 	"CacheGossip/pkg/models"
@@ -14,31 +15,20 @@ import (
 type Gossip struct {
 	nodeName, address string
 	membership        *membership.Membership
+	cache             *cache.Cache
 	logger            *logger.Logger
 }
 type GossipStatus struct {
 	Memberships *membership.MembershipStatus
 }
 
-func NewGossip(nodeName, nodeAddress string, membership *membership.Membership, logger *logger.Logger) *Gossip {
-	return &Gossip{nodeName, nodeAddress, membership, logger}
+func NewGossip(nodeName, nodeAddress string, membership *membership.Membership, cache *cache.Cache, logger *logger.Logger) *Gossip {
+	return &Gossip{nodeName, nodeAddress, membership, cache, logger}
 }
 
 func (g *Gossip) Start(ctx context.Context) {
 	go g.membership.Start(ctx)
-
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
-	g.logger.Info("Start sending gossip")
-	for {
-		select {
-		case <-ticker.C:
-			g.sendGossip()
-		case <-ctx.Done():
-			g.logger.Info("End sending gossip")
-			return
-		}
-	}
+	go g.startMembershipGossip(ctx)
 }
 
 func (g *Gossip) Status() *GossipStatus {
@@ -77,9 +67,22 @@ func (g *Gossip) ProcessMembership(msg models.GossipMessage) {
 
 	g.membership.AddMember(msg.Sender, msg.Address, msg.Time)
 	g.logger.Info("New member %s", msg.Sender)
-	return
 }
 
+func (g *Gossip) startMembershipGossip(ctx context.Context) {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	g.logger.Info("Start sending membership gossip")
+	for {
+		select {
+		case <-ticker.C:
+			g.sendGossip()
+		case <-ctx.Done():
+			g.logger.Info("End sending membership gossip")
+			return
+		}
+	}
+}
 func (g *Gossip) sendGossip() {
 	member := g.membership.RandomMember()
 

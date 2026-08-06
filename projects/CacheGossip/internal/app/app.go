@@ -37,7 +37,7 @@ func initServices(cfg config.Config) services {
 	var nodes map[string]string
 	json.Unmarshal([]byte(cfg.SeedNodes.NodesRaw), &nodes)
 	membersip := membership.NewMembership(nodes)
-	gossip := gossip.NewGossip(cfg.App.Name, cfg.App.Address, membersip, logger)
+	gossip := gossip.NewGossip(cfg.App.Name, cfg.App.Address, membersip, cache, logger)
 	return services{logger, cache, gossip}
 }
 
@@ -49,9 +49,9 @@ func initGossip(src services, cfg config.Config) *http.Server {
 	client := api.NewGossipApi(cfg.App.Name, src.gossip, src.logger)
 	r := chi.NewRouter()
 
-	r.Use(myMiddleware.LoggerMiddleware(src.logger))
+	r.Use(myMiddleware.Logger(src.logger))
 	r.Use(middleware.Recoverer)
-	r.Use(myMiddleware.JSONMiddleware)
+	r.Use(myMiddleware.JSON)
 	r.Use(middleware.Timeout(60 * time.Second))
 
 	r.Get("/health", client.Health)
@@ -80,9 +80,9 @@ func initClientApi(src services, cfg config.Config) *http.Server {
 
 	r := chi.NewRouter()
 
-	r.Use(myMiddleware.LoggerMiddleware(src.logger))
+	r.Use(myMiddleware.Logger(src.logger))
 	r.Use(middleware.Recoverer)
-	r.Use(myMiddleware.JSONMiddleware)
+	r.Use(myMiddleware.JSON)
 	r.Use(middleware.Timeout(60 * time.Second))
 
 	r.Get("/health", client.Health)
