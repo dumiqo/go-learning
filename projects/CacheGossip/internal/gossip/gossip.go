@@ -6,6 +6,7 @@ import (
 	"CacheGossip/pkg/models"
 	"bytes"
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 )
@@ -47,6 +48,17 @@ func (g *Gossip) Status() *GossipStatus {
 
 func (g *Gossip) ProcessGossip(msg models.GossipMessage) error {
 	g.logger.Info("Begin processiong gossip from: %s. uuid: %s", msg.Sender, msg.UUID)
+	switch msg.Type {
+	case models.Membership:
+		g.ProcessMembership(msg)
+	default:
+		return fmt.Errorf("Unknown msg type: %s", msg.Type)
+	}
+	g.logger.Info("End in processiong gossip from: %s. uuid: %s", msg.Sender, msg.UUID)
+	return nil
+}
+
+func (g *Gossip) ProcessMembership(msg models.GossipMessage) {
 	for _, node := range msg.Nodes {
 		if g.nodeName == node.Name {
 			continue
@@ -58,12 +70,14 @@ func (g *Gossip) ProcessGossip(msg models.GossipMessage) error {
 		g.logger.Info("Update member, %s", node.Name)
 	}
 
-	if updated := g.membership.UpdateStatus(msg.Sender, msg.Time); !updated {
-		g.membership.AddMember(msg.Sender, msg.Address, msg.Time)
-		g.logger.Warning("New member %s", msg.Sender)
+	if g.membership.IsKnownMember(msg.Sender) {
+		g.membership.UpdateStatus(msg.Sender, msg.Time)
+		return
 	}
-	g.logger.Info("End in processiong gossip from: %s. uuid: %s", msg.Sender, msg.UUID)
-	return nil
+
+	g.membership.AddMember(msg.Sender, msg.Address, msg.Time)
+	g.logger.Info("New member %s", msg.Sender)
+	return
 }
 
 func (g *Gossip) sendGossip() {

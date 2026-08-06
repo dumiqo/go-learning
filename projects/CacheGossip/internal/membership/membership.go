@@ -81,20 +81,23 @@ func (m *Membership) KillNode(name string) bool {
 
 	return true
 }
-func (m *Membership) UpdateStatus(name string, time time.Time) bool {
+func (m *Membership) IsKnownMember(name string) bool {
+	_, exist := m.members[name]
+	return exist
+
+}
+func (m *Membership) UpdateStatus(name string, time time.Time) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	member, exists := m.members[name]
 	if !exists {
-		return false
+		return
 	}
 
 	member.LastSeen = time
 	member.Status = models.NewStatus(time)
 
 	m.members[name] = member
-
-	return true
 }
 func (m *Membership) AddMember(
 	name string,

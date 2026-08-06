@@ -60,3 +60,12 @@ func NewMembershipGossip(name, address string, nodes []NodeInfo) GossipMessage {
 		Nodes: nodes,
 	}
 }
+
+func (s Type) String() string {
+	switch s {
+	case Membership:
+		return "membership"
+	default:
+		return "unknown"
+	}
+}
