@@ -129,7 +129,6 @@ func Run(cfg *config.Config) {
 	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	services.cache.Stop()
 	servers.client.Shutdown(ctx)
 	servers.gossip.Shutdown(ctx)
 

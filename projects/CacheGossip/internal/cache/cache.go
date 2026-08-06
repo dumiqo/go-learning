@@ -104,10 +104,6 @@ func (c *Cache) Get(key string) (string, bool) {
 	return item.value, true
 }
 
-func (c *Cache) Stop() {
-	close(c.stopChan)
-}
-
 func (c *Cache) Stat() CacheStat {
 	return CacheStat{len(c.items), c.miss, c.hit}
 }

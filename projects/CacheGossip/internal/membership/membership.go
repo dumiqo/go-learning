@@ -44,7 +44,6 @@ func (m *Membership) Status() *MembershipStatus {
 }
 
 func (m *Membership) Start(ctx context.Context) error {
-
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
@@ -152,12 +151,23 @@ func (m *Membership) RandomMember() member {
 }
 
 func (m *Membership) randomMemberKey() string {
-	keys := make([]string, len(m.members))
-	for k, _ := range m.members {
+	keys := make([]string, 0, len(m.members))
+	alive := make([]string, 0, len(m.members))
+	for k, member := range m.members {
+		if member.Status != models.Dead {
+			alive = append(alive, k)
+		}
 		keys = append(keys, k)
 	}
-	i := rand.Intn(len(keys))
-	return keys[i]
+	if len(alive) == 0 {
+		return randomItem(keys)
+	}
+	return randomItem(alive)
+}
+
+func randomItem(slice []string) string {
+	i := rand.Intn(len(slice))
+	return slice[i]
 }
 
 func NewMembership(hosts map[string]string) *Membership {
