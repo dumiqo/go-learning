@@ -118,6 +118,7 @@ func Run(cfg *config.Config) {
 	defer cancel()
 
 	go services.gossip.Start(ctx)
+	go services.cache.Start(ctx)
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)

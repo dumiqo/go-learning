@@ -2,15 +2,15 @@ package cache
 
 import (
 	"CacheGossip/pkg/logger"
+	"context"
 	"sync"
 	"time"
 )
 
 type Cache struct {
-	mu       sync.RWMutex
-	log      *logger.Logger
-	items    map[string]cacheItem
-	stopChan chan int
+	mu    sync.RWMutex
+	log   *logger.Logger
+	items map[string]cacheItem
 
 	miss, hit int
 }
@@ -24,14 +24,14 @@ type cacheItem struct {
 	ttl   time.Time
 }
 
-func (c *Cache) autoClean() {
+func (c *Cache) autoClean(ctx context.Context) {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
 			c.cleanExpired()
-		case <-c.stopChan:
+		case <-ctx.Done():
 			return // ← корректное завершение
 		}
 	}
@@ -64,11 +64,11 @@ func (c *Cache) cleanExpired() {
 }
 
 func NewCache(logger *logger.Logger) (*Cache, error) {
-	c := Cache{sync.RWMutex{}, logger, make(map[string]cacheItem), make(chan int), 0, 0}
+	return &Cache{sync.RWMutex{}, logger, make(map[string]cacheItem), 0, 0}, nil
+}
 
-	go c.autoClean()
-
-	return &c, nil
+func (c *Cache) Start(cnx context.Context) {
+	c.autoClean(cnx)
 }
 
 func (c *Cache) Set(key, value string, ttl time.Time) error {
@@ -105,7 +105,7 @@ func (c *Cache) Get(key string) (string, bool) {
 }
 
 func (c *Cache) Stop() {
-	close(c.stopChan) // останавливаем горутину
+	close(c.stopChan)
 }
 
 func (c *Cache) Stat() CacheStat {

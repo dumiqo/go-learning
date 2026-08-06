@@ -28,8 +28,8 @@ func (g *Gossip) Start(ctx context.Context) {
 	go g.membership.Start(ctx)
 
 	ticker := time.NewTicker(5 * time.Second)
-	g.logger.Info("Start sending gossip")
 	defer ticker.Stop()
+	g.logger.Info("Start sending gossip")
 	for {
 		select {
 		case <-ticker.C:
