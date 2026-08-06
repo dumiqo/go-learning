@@ -15,10 +15,11 @@ const (
 )
 
 type GossipMessage struct {
-	Sender string    `json:"sender"`
-	Time   time.Time `json:"time"`
-	UUID   uuid.UUID `json:"uuid"`
-	Type   Type      `json:"type"`
+	Sender  string    `json:"sender"`
+	Address string    `json:"address"`
+	Time    time.Time `json:"time"`
+	UUID    uuid.UUID `json:"uuid"`
+	Type    Type      `json:"type"`
 
 	Nodes []NodeInfo `json:"nodes,omitempty"`
 }
@@ -48,12 +49,13 @@ func (r *GossipMessage) ToJSON() ([]byte, error) {
 func (r *GossipMessage) FromJSON(data []byte) error {
 	return json.Unmarshal(data, r)
 }
-func NewMembershipGossip(name string, nodes []NodeInfo) GossipMessage {
+func NewMembershipGossip(name, address string, nodes []NodeInfo) GossipMessage {
 	return GossipMessage{
-		Sender: name,
-		UUID:   uuid.New(),
-		Time:   time.Now().UTC(),
-		Type:   Membership,
+		Sender:  name,
+		Address: address,
+		UUID:    uuid.New(),
+		Time:    time.Now().UTC(),
+		Type:    Membership,
 
 		Nodes: nodes,
 	}

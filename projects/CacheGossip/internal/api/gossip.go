@@ -24,6 +24,10 @@ func (g *GossipApi) Health(w http.ResponseWriter, r *http.Request) {
 	response.SendOK(w, g.Name, map[string]string{"status": "ok"})
 }
 
+func (g *GossipApi) Status(w http.ResponseWriter, r *http.Request) {
+	response.SendOK(w, g.Name, g.gossip.Status())
+}
+
 func (g *GossipApi) Gossip(w http.ResponseWriter, r *http.Request) {
 	var msg models.GossipMessage
 

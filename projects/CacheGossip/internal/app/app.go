@@ -37,7 +37,7 @@ func initServices(cfg config.Config) services {
 	var nodes map[string]string
 	json.Unmarshal([]byte(cfg.SeedNodes.NodesRaw), &nodes)
 	membersip := membership.NewMembership(nodes)
-	gossip := gossip.NewGossip(cfg.App.Name, membersip, logger)
+	gossip := gossip.NewGossip(cfg.App.Name, cfg.App.Address, membersip, logger)
 	return services{logger, cache, gossip}
 }
 
@@ -56,6 +56,7 @@ func initGossip(src services, cfg config.Config) *http.Server {
 
 	r.Get("/health", client.Health)
 	r.Post("/gossip", client.Gossip)
+	r.Get("/status", client.Status)
 
 	clientServer := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Gossip.Port),

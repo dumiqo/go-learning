@@ -11,16 +11,21 @@ import (
 )
 
 type Gossip struct {
-	nodeName   string
-	membership *membership.Membership
-	logger     *logger.Logger
+	nodeName, address string
+	membership        *membership.Membership
+	logger            *logger.Logger
+}
+type GossipStatus struct {
+	Memberships *membership.MembershipStatus
 }
 
-func NewGossip(nodeName string, membership *membership.Membership, logger *logger.Logger) *Gossip {
-	return &Gossip{nodeName, membership, logger}
+func NewGossip(nodeName, nodeAddress string, membership *membership.Membership, logger *logger.Logger) *Gossip {
+	return &Gossip{nodeName, nodeAddress, membership, logger}
 }
 
 func (g *Gossip) Start(ctx context.Context) {
+	go g.membership.Start(ctx)
+
 	ticker := time.NewTicker(5 * time.Second)
 	g.logger.Info("Start sending gossip")
 	defer ticker.Stop()
@@ -33,6 +38,11 @@ func (g *Gossip) Start(ctx context.Context) {
 			return
 		}
 	}
+}
+
+func (g *Gossip) Status() *GossipStatus {
+	mStatus := g.membership.Status()
+	return &GossipStatus{mStatus}
 }
 
 func (g *Gossip) ProcessGossip(msg models.GossipMessage) error {
@@ -48,8 +58,9 @@ func (g *Gossip) ProcessGossip(msg models.GossipMessage) error {
 		g.logger.Info("Update member, %s", node.Name)
 	}
 
-	if err := g.membership.UpdateStatus(msg.Sender, msg.Time); err != nil {
-		g.logger.Error("Error in updating membership. member: %s. %s", msg.Sender, err)
+	if updated := g.membership.UpdateStatus(msg.Sender, msg.Time); !updated {
+		g.membership.AddMember(msg.Sender, msg.Address, msg.Time)
+		g.logger.Warning("New member %s", msg.Sender)
 	}
 	g.logger.Info("End in processiong gossip from: %s. uuid: %s", msg.Sender, msg.UUID)
 	return nil
@@ -58,7 +69,7 @@ func (g *Gossip) ProcessGossip(msg models.GossipMessage) error {
 func (g *Gossip) sendGossip() {
 	member := g.membership.RandomMember()
 
-	msg := models.NewMembershipGossip(g.nodeName, g.membership.GetNodeInfo())
+	msg := models.NewMembershipGossip(g.nodeName, g.address, g.membership.GetNodeInfo())
 
 	json, err := msg.ToJSON()
 
@@ -82,6 +93,7 @@ func (g *Gossip) sendGossip() {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
+		g.membership.KillNode(g.nodeName)
 		g.logger.Warning("gossip response error: status %d", resp.StatusCode)
 		return
 	}

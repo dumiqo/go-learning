@@ -14,7 +14,8 @@ type (
 		App       app
 	}
 	app struct {
-		Name string `env:"APP_NAME,required"`
+		Name    string `env:"APP_NAME,required"`
+		Address string `env:"APP_ADDRESS,required"`
 	}
 	http struct {
 		Port int `env:"HTTP_PORT,required"`

@@ -6,6 +6,7 @@ services:
       context: .
     environment:
       APP_NAME: "first"
+      APP_ADDRESS: "http://first:8081/gossip"
       HTTP_PORT: "8080"
       GOSSIP_PORT: "8081"
       SEEDNODES_NODES: '{"second":"http://second:8081/gossip","third":"http://third:8081/gossip","for":"http://for:8081/gossip","fifth":"http://fifth:8081/gossip"}'
@@ -28,6 +29,7 @@ services:
       context: .
     environment:
       APP_NAME: "second"
+      APP_ADDRESS: "http://second:8081/gossip"
       HTTP_PORT: "8080"
       GOSSIP_PORT: "8081"
       SEEDNODES_NODES: '{"first":"http://first:8081/gossip","third":"http://third:8081/gossip","for":"http://for:8081/gossip","fifth":"http://fifth:8081/gossip"}'
@@ -50,6 +52,7 @@ services:
       context: .
     environment:
       APP_NAME: "third"
+      APP_ADDRESS: "http://third:8081/gossip"
       HTTP_PORT: "8080"
       GOSSIP_PORT: "8081"
       SEEDNODES_NODES: '{"second":"http://second:8081/gossip","first":"http://first:8081/gossip","for":"http://for:8081/gossip","fifth":"http://fifth:8081/gossip"}'
@@ -72,6 +75,7 @@ services:
       context: .
     environment:
       APP_NAME: "for"
+      APP_ADDRESS: "http://for:8081/gossip"
       HTTP_PORT: "8080"
       GOSSIP_PORT: "8081"
       SEEDNODES_NODES: '{"second":"http://second:8081/gossip","first":"http://first:8081/gossip","third":"http://third:8081/gossip","fifth":"http://fifth:8081/gossip"}'
@@ -94,12 +98,36 @@ services:
       context: .
     environment:
       APP_NAME: "fifth"
+      APP_ADDRESS: "http://fifth:8081/gossip"
       HTTP_PORT: "8080"
       GOSSIP_PORT: "8081"
       SEEDNODES_NODES: '{"second":"http://second:8081/gossip","first":"http://first:8081/gossip","third":"http://third:8081/gossip","for":"http://for:8081/gossip"}'
     ports:
       - "8085:8080"
       - "8185:8081"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: '1Gb'
+        reservations:
+          cpus: '0.60'
+          memory: '1Gb'  
+
+  manual:
+    container_name: manual
+    platform: linux/amd64
+    build:
+      context: .
+    environment:
+      APP_NAME: "manual"
+      APP_ADDRESS: "http://manual:8081/gossip"
+      HTTP_PORT: "8080"
+      GOSSIP_PORT: "8081"
+      SEEDNODES_NODES: '{"first":"http://first:8081/gossip"}'
+    ports:
+      - "8086:8080"
+      - "8186:8081"
     deploy:
       resources:
         limits:

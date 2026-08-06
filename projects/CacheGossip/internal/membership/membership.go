@@ -20,6 +20,28 @@ type member struct {
 	Status   models.Status
 	LastSeen time.Time
 }
+type MembershipStatus struct {
+	Members []MemberStatus
+}
+type MemberStatus struct {
+	Name     string
+	Url      string
+	Status   models.Status
+	LastSeen time.Time
+}
+
+func (m *Membership) Status() *MembershipStatus {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	mStatus := make([]MemberStatus, 0, len(m.members))
+
+	for _, v := range m.members {
+		mStatus = append(mStatus, MemberStatus{v.Name, v.Url, v.Status, v.LastSeen})
+	}
+
+	return &MembershipStatus{mStatus}
+}
 
 func (m *Membership) Start(ctx context.Context) error {
 
@@ -44,12 +66,27 @@ func (m *Membership) updateStatus() {
 		m.members[k] = v
 	}
 }
-func (m *Membership) UpdateStatus(name string, time time.Time) error {
+func (m *Membership) KillNode(name string) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	member, exists := m.members[name]
 	if !exists {
-		return fmt.Errorf("node %s not found", name)
+		return false
+	}
+
+	member.LastSeen = time.Now()
+	member.Status = models.Dead
+
+	m.members[name] = member
+
+	return true
+}
+func (m *Membership) UpdateStatus(name string, time time.Time) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	member, exists := m.members[name]
+	if !exists {
+		return false
 	}
 
 	member.LastSeen = time
@@ -57,14 +94,21 @@ func (m *Membership) UpdateStatus(name string, time time.Time) error {
 
 	m.members[name] = member
 
-	return nil
+	return true
+}
+func (m *Membership) AddMember(
+	name string,
+	url string,
+	lastSeen time.Time) {
+	m.members[name] = member{name, url, models.NewStatus(lastSeen), lastSeen}
 }
 func (m *Membership) Update(node models.NodeInfo) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	member, exists := m.members[node.Name]
 	if !exists {
-		return fmt.Errorf("node %s not found", node.Name)
+		m.members[node.Name] = newMember(node)
+		return nil
 	}
 
 	if member.Name == node.Name {
