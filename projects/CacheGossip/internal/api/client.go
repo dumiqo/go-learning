@@ -47,7 +47,8 @@ func (c *ClientApi) Post(w http.ResponseWriter, r *http.Request) {
 		response.SendError(w, c.Name, 400, err)
 		return
 	}
-	err = c.cache.Set(req.Key, req.Value, time.Now().Add(ttl))
+	now := time.Now().UTC()
+	err = c.cache.Set(req.Key, req.Value, now.Add(ttl), now)
 	if err != nil {
 		response.SendError(w, c.Name, 400, err)
 		return
@@ -66,7 +67,7 @@ func (c *ClientApi) Get(w http.ResponseWriter, r *http.Request) {
 }
 func (c *ClientApi) Delete(w http.ResponseWriter, r *http.Request) {
 	key := chi.URLParam(r, "key")
-	err := c.cache.Remove(key)
+	err := c.cache.Delete(key, time.Now().UTC())
 	if err != nil {
 		response.SendError(w, c.Name, 400, err)
 	} else {

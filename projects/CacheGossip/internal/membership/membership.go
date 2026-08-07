@@ -73,7 +73,7 @@ func (m *Membership) KillNode(name string) bool {
 		return false
 	}
 
-	member.LastSeen = time.Now()
+	member.LastSeen = time.Now().UTC()
 	member.Status = models.Dead
 
 	m.members[name] = member
@@ -151,6 +151,14 @@ func (m *Membership) RandomMember() member {
 }
 
 func (m *Membership) randomMemberKey() string {
+	keys := make([]string, 0, len(m.members))
+	for k, _ := range m.members {
+		keys = append(keys, k)
+	}
+	return randomItem(keys)
+}
+
+func (m *Membership) randomAliveMemberKey() string {
 	keys := make([]string, 0, len(m.members))
 	alive := make([]string, 0, len(m.members))
 	for k, member := range m.members {

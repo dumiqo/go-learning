@@ -29,6 +29,7 @@ func NewGossip(nodeName, nodeAddress string, membership *membership.Membership, 
 func (g *Gossip) Start(ctx context.Context) {
 	go g.membership.Start(ctx)
 	go g.startMembershipGossip(ctx)
+	go g.startOperationsGossip(ctx)
 }
 
 func (g *Gossip) Status() *GossipStatus {
@@ -41,6 +42,8 @@ func (g *Gossip) ProcessGossip(msg models.GossipMessage) error {
 	switch msg.Type {
 	case models.Membership:
 		g.ProcessMembership(msg)
+	case models.Operations:
+		g.ProcessOperations(msg)
 	default:
 		return fmt.Errorf("Unknown msg type: %s", msg.Type)
 	}
@@ -69,24 +72,92 @@ func (g *Gossip) ProcessMembership(msg models.GossipMessage) {
 	g.logger.Info("New member %s", msg.Sender)
 }
 
+func (g *Gossip) ProcessOperations(msg models.GossipMessage) {
+	if len(msg.Operations) <= 0 {
+		g.logger.Info("Nothing to apply from: %s.", msg.Sender)
+		return
+	}
+	for _, op := range msg.Operations {
+		switch op.Type {
+		case models.Set:
+			g.cache.Set(op.Key, op.Value, op.TTL, op.Created)
+		case models.Delete:
+			g.cache.Delete(op.Key, op.Created)
+		}
+	}
+	g.logger.Info("Apply operations from: %s. applyed %d operations", msg.Sender, len(msg.Operations))
+}
+
 func (g *Gossip) startMembershipGossip(ctx context.Context) {
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	g.logger.Info("Start sending membership gossip")
 	for {
 		select {
 		case <-ticker.C:
-			g.sendGossip()
+			g.sendMembershipGossip()
 		case <-ctx.Done():
 			g.logger.Info("End sending membership gossip")
 			return
 		}
 	}
 }
-func (g *Gossip) sendGossip() {
+
+func (g *Gossip) startOperationsGossip(ctx context.Context) {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	g.logger.Info("Start sending operations gossip")
+	for {
+		select {
+		case <-ticker.C:
+			g.sendOperationsGossip()
+		case <-ctx.Done():
+			g.logger.Info("End sending operations gossip")
+			return
+		}
+	}
+}
+func (g *Gossip) sendMembershipGossip() {
 	member := g.membership.RandomMember()
 
 	msg := models.NewMembershipGossip(g.nodeName, g.address, g.membership.GetNodeInfo())
+
+	json, err := msg.ToJSON()
+
+	if err != nil {
+		g.logger.Error("Error in serializing. %s", err)
+		return
+	}
+	req, err := http.NewRequest("POST", member.Url, bytes.NewBuffer(json))
+	if err != nil {
+		g.logger.Error("Error creating request to %s. %s", member.Name, err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		g.logger.Error("gossip request failed: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		g.membership.KillNode(g.nodeName)
+		g.logger.Warning("gossip response error: status %d", resp.StatusCode)
+		return
+	}
+}
+
+func (g *Gossip) sendOperationsGossip() {
+	member := g.membership.RandomMember()
+
+	operations := make([]models.Operation, len(g.cache.GetPendingOperations().Operations))
+	for _, o := range g.cache.GetPendingOperations().Operations {
+		operations = append(operations, models.Operation{o.Key, o.Value, o.Type, o.Ttl, o.Created})
+	}
+	msg := models.NewOperationsGossip(g.nodeName, g.address, operations)
 
 	json, err := msg.ToJSON()
 

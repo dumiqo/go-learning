@@ -2,8 +2,8 @@ package cache
 
 import (
 	"CacheGossip/pkg/logger"
-	"CacheGossip/pkg/models"
 	"context"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -13,6 +13,8 @@ type Cache struct {
 	log   *logger.Logger
 	items map[string]cacheItem
 
+	buffer *OperationBuffer
+
 	miss, hit int
 }
 
@@ -21,8 +23,9 @@ type CacheStat struct {
 }
 
 type cacheItem struct {
-	value string
-	ttl   time.Time
+	value   string
+	created time.Time
+	ttl     time.Time
 }
 
 func (c *Cache) autoClean(ctx context.Context) {
@@ -40,7 +43,7 @@ func (c *Cache) autoClean(ctx context.Context) {
 func (c *Cache) cleanExpired() {
 	c.log.Info("Start autoclean")
 	c.mu.RLock()
-	now := time.Now()
+	now := time.Now().UTC()
 	toDelete := make([]string, 0, 100)
 
 	for k, v := range c.items {
@@ -58,6 +61,7 @@ func (c *Cache) cleanExpired() {
 		c.mu.Lock()
 		for _, k := range toDelete {
 			delete(c.items, k)
+			c.buffer.Delete(k, time.Now().UTC())
 		}
 		c.mu.Unlock()
 	}
@@ -65,25 +69,39 @@ func (c *Cache) cleanExpired() {
 }
 
 func NewCache(logger *logger.Logger) (*Cache, error) {
-	return &Cache{sync.RWMutex{}, logger, make(map[string]cacheItem), 0, 0}, nil
+	return &Cache{sync.RWMutex{}, logger, make(map[string]cacheItem), NewOperations(), 0, 0}, nil
 }
 
 func (c *Cache) Start(cnx context.Context) {
 	c.autoClean(cnx)
 }
 
-func (c *Cache) Set(key, value string, ttl time.Time) error {
+func (c *Cache) Set(key, value string, ttl, create time.Time) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.items[key] = cacheItem{value, ttl}
+	v, exist := c.items[key]
+
+	if exist && v.created.After(create) {
+		return nil
+	}
+
+	c.items[key] = cacheItem{value, create, ttl}
+	err := c.buffer.Set(key, value, ttl, create)
+	if err != nil {
+		return fmt.Errorf("Error in saving to operation buffer. %s", err)
+	}
 	return nil
 }
 
-func (c *Cache) Remove(key string) error {
+func (c *Cache) Delete(key string, time time.Time) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	delete(c.items, key)
+	err := c.buffer.Delete(key, time)
+	if err != nil {
+		return fmt.Errorf("Error in saving to operation buffer. %s", err)
+	}
 	return nil
 }
 
@@ -97,7 +115,7 @@ func (c *Cache) Get(key string) (string, bool) {
 		c.miss++
 		return "", false
 	}
-	if time.Now().After(item.ttl) {
+	if time.Now().UTC().After(item.ttl) {
 		delete(c.items, key)
 		return "", false
 	}
@@ -108,6 +126,6 @@ func (c *Cache) Get(key string) (string, bool) {
 func (c *Cache) Stat() CacheStat {
 	return CacheStat{len(c.items), c.miss, c.hit}
 }
-func (c *Cache) GetPendingOperations() []models.PendingOperation {
-	return CacheStat{len(c.items), c.miss, c.hit}
+func (c *Cache) GetPendingOperations() *OperationBuffer {
+	return c.buffer
 }

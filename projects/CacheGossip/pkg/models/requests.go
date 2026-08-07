@@ -12,6 +12,7 @@ type Type int
 
 const (
 	Membership Type = iota
+	Operations
 )
 
 type GossipMessage struct {
@@ -21,7 +22,8 @@ type GossipMessage struct {
 	UUID    uuid.UUID `json:"uuid"`
 	Type    Type      `json:"type"`
 
-	Nodes []NodeInfo `json:"nodes,omitempty"`
+	Nodes      []NodeInfo  `json:"nodes,omitempty"`
+	Operations []Operation `json:"operations,omitempty"`
 }
 
 type NodeInfo struct {
@@ -31,6 +33,21 @@ type NodeInfo struct {
 	LastSeen time.Time `json:"last_seen"`
 }
 
+type Operation struct {
+	Key     string        `json:"key"`
+	Value   string        `json:"value"`
+	Type    OperationType `json:"type"`
+	TTL     time.Time     `json:"ttl"`
+	Created time.Time     `json:"created"`
+}
+
+type OperationType int
+
+const (
+	Set    OperationType = iota //0
+	Delete                      //1
+)
+
 func (r *GossipMessage) Validate() error {
 	if r.Sender == "" {
 		return fmt.Errorf("Sender is required")
@@ -38,7 +55,7 @@ func (r *GossipMessage) Validate() error {
 	if r.UUID == uuid.Nil {
 		return fmt.Errorf("uuid is required")
 	}
-	if time.Now().Before(r.Time) {
+	if time.Now().UTC().Before(r.Time.UTC()) {
 		return fmt.Errorf("gossip from future")
 	}
 	return nil
@@ -58,6 +75,17 @@ func NewMembershipGossip(name, address string, nodes []NodeInfo) GossipMessage {
 		Type:    Membership,
 
 		Nodes: nodes,
+	}
+}
+func NewOperationsGossip(name, address string, operations []Operation) GossipMessage {
+	return GossipMessage{
+		Sender:  name,
+		Address: address,
+		UUID:    uuid.New(),
+		Time:    time.Now().UTC(),
+		Type:    Operations,
+
+		Operations: operations,
 	}
 }
 
