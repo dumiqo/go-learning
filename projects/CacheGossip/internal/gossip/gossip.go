@@ -29,7 +29,7 @@ func NewGossip(nodeName, nodeAddress string, membership *membership.Membership, 
 func (g *Gossip) Start(ctx context.Context) {
 	go g.membership.Start(ctx)
 	go g.startMembershipGossip(ctx)
-	go g.startOperationsGossip(ctx)
+	go g.startDataGossip(ctx)
 }
 
 func (g *Gossip) Status() *GossipStatus {
@@ -42,8 +42,8 @@ func (g *Gossip) ProcessGossip(msg models.GossipMessage) error {
 	switch msg.Type {
 	case models.Membership:
 		g.ProcessMembership(msg)
-	case models.Operations:
-		g.ProcessOperations(msg)
+	case models.Data:
+		g.ProcessData(msg)
 	default:
 		return fmt.Errorf("Unknown msg type: %s", msg.Type)
 	}
@@ -72,7 +72,7 @@ func (g *Gossip) ProcessMembership(msg models.GossipMessage) {
 	g.logger.Info("New member %s", msg.Sender)
 }
 
-func (g *Gossip) ProcessOperations(msg models.GossipMessage) {
+func (g *Gossip) ProcessData(msg models.GossipMessage) {
 	if len(msg.Operations) <= 0 {
 		g.logger.Info("Nothing to apply from: %s.", msg.Sender)
 		return
@@ -91,34 +91,35 @@ func (g *Gossip) ProcessOperations(msg models.GossipMessage) {
 func (g *Gossip) startMembershipGossip(ctx context.Context) {
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
-	g.logger.Info("Start sending membership gossip")
+	g.logger.Info("Start sending membership gossips")
 	for {
 		select {
 		case <-ticker.C:
 			g.sendMembershipGossip()
 		case <-ctx.Done():
-			g.logger.Info("End sending membership gossip")
+			g.logger.Info("End sending membership gossips")
 			return
 		}
 	}
 }
 
-func (g *Gossip) startOperationsGossip(ctx context.Context) {
+func (g *Gossip) startDataGossip(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
-	g.logger.Info("Start sending operations gossip")
+	g.logger.Info("Start sending data gossips")
 	for {
 		select {
 		case <-ticker.C:
-			g.sendOperationsGossip()
+			g.sendDataGossip()
 		case <-ctx.Done():
-			g.logger.Info("End sending operations gossip")
+			g.logger.Info("End sending data gossips")
 			return
 		}
 	}
 }
 func (g *Gossip) sendMembershipGossip() {
-	member := g.membership.RandomMember()
+	member := g.membership.GetMember()
+	g.logger.Info("Send member gossip to %s", member.Name)
 
 	msg := models.NewMembershipGossip(g.nodeName, g.address, g.membership.GetNodeInfo())
 
@@ -148,11 +149,12 @@ func (g *Gossip) sendMembershipGossip() {
 		g.logger.Warning("gossip response error: status %d", resp.StatusCode)
 		return
 	}
+	g.membership.UpdateSendedTime(member)
 }
 
-func (g *Gossip) sendOperationsGossip() {
-	member := g.membership.RandomMember()
-
+func (g *Gossip) sendDataGossip() {
+	member := g.membership.GetMember()
+	g.logger.Info("Send data gossip to %s", member.Name)
 	operations := make([]models.Operation, len(g.cache.GetPendingOperations().Operations))
 	for _, o := range g.cache.GetPendingOperations().Operations {
 		operations = append(operations, models.Operation{o.Key, o.Value, o.Type, o.Ttl, o.Created})
@@ -185,4 +187,5 @@ func (g *Gossip) sendOperationsGossip() {
 		g.logger.Warning("gossip response error: status %d", resp.StatusCode)
 		return
 	}
+	g.membership.UpdateSendedTime(member)
 }

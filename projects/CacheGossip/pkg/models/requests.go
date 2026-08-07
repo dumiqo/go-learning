@@ -12,7 +12,7 @@ type Type int
 
 const (
 	Membership Type = iota
-	Operations
+	Data
 )
 
 type GossipMessage struct {
@@ -83,7 +83,7 @@ func NewOperationsGossip(name, address string, operations []Operation) GossipMes
 		Address: address,
 		UUID:    uuid.New(),
 		Time:    time.Now().UTC(),
-		Type:    Operations,
+		Type:    Data,
 
 		Operations: operations,
 	}

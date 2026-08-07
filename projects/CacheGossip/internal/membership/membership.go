@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sort"
 	"sync"
 	"time"
 )
@@ -15,10 +16,10 @@ type Membership struct {
 }
 
 type member struct {
-	Name     string
-	Url      string
-	Status   models.Status
-	LastSeen time.Time
+	Name               string
+	Url                string
+	Status             models.Status
+	LastSeen, LastSend time.Time
 }
 type MembershipStatus struct {
 	Members []MemberStatus
@@ -102,7 +103,7 @@ func (m *Membership) AddMember(
 	name string,
 	url string,
 	lastSeen time.Time) {
-	m.members[name] = member{name, url, models.NewStatus(lastSeen), lastSeen}
+	m.members[name] = member{name, url, models.NewStatus(lastSeen), lastSeen, time.Time{}}
 }
 func (m *Membership) Update(node models.NodeInfo) error {
 	m.mu.Lock()
@@ -117,14 +118,20 @@ func (m *Membership) Update(node models.NodeInfo) error {
 		if node.LastSeen.Before(member.LastSeen) {
 			return fmt.Errorf("Cannot update node")
 		}
-		m.members[node.Name] = newMember(node)
+		m.members[node.Name] = updateMember(member, node)
 	}
 
 	return nil
 }
 
 func newMember(node models.NodeInfo) member {
-	return member{node.Name, node.Address, node.Status, node.LastSeen}
+	return member{node.Name, node.Address, node.Status, node.LastSeen, time.Time{}}
+}
+func updateMember(m member, node models.NodeInfo) member {
+	nm := member{node.Name, node.Address, node.Status, node.LastSeen, time.Time{}}
+
+	nm.LastSend = m.LastSend
+	return nm
 }
 
 func (m *member) toNodeInfo() models.NodeInfo {
@@ -143,11 +150,42 @@ func (m *Membership) GetNodeInfo() []models.NodeInfo {
 	return nodes
 }
 
-func (m *Membership) RandomMember() member {
+func (m *Membership) GetMember() member {
+	return m.lastSendMember()
+}
+
+func (m *Membership) randomMember() member {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	key := m.randomMemberKey()
 	return m.members[key]
+}
+
+func (m *Membership) lastSendMember() member {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	keys := make([]string, 0, len(m.members))
+
+	for _, v := range m.members {
+		keys = append(keys, v.Name)
+	}
+
+	sort.Slice(keys, func(i, j int) bool {
+		return m.members[keys[i]].LastSend.Before(m.members[keys[j]].LastSend)
+	})
+
+	return m.members[keys[0]]
+}
+
+func (m *Membership) UpdateSendedTime(member member) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	item, exist := m.members[member.Name]
+	if !exist {
+		return
+	}
+	item.LastSend = time.Now().UTC()
+	m.members[member.Name] = item
 }
 
 func (m *Membership) randomMemberKey() string {
@@ -181,7 +219,7 @@ func randomItem(slice []string) string {
 func NewMembership(hosts map[string]string) *Membership {
 	members := make(map[string]member)
 	for k, v := range hosts {
-		members[k] = member{k, v, models.Suspect, time.Time{}}
+		members[k] = member{k, v, models.Suspect, time.Time{}, time.Time{}}
 	}
 	return &Membership{members, sync.RWMutex{}}
 }
