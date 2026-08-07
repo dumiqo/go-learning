@@ -155,10 +155,17 @@ func (g *Gossip) sendMembershipGossip() {
 func (g *Gossip) sendDataGossip() {
 	member := g.membership.GetMember()
 	g.logger.Info("Send data gossip to %s", member.Name)
-	allOp := g.cache.GetPendingOperations()
+	allOp := g.cache.GetPendingOperations(member.LastIndex)
+	if len(allOp) <= 0 {
+		g.logger.Info("Nothing to send")
+		return
+	}
 	operations := make([]models.Operation, len(allOp))
-	for _, o := range allOp {
+	maxIndex := 0
+	for i, o := range allOp {
 		operations = append(operations, models.Operation{o.Key, o.Value, o.Type, o.Ttl, o.Created})
+		maxIndex = i
+
 	}
 	msg := models.NewOperationsGossip(g.nodeName, g.address, operations)
 
@@ -189,4 +196,5 @@ func (g *Gossip) sendDataGossip() {
 		return
 	}
 	g.membership.UpdateSendedTime(member)
+	g.membership.UpdateMember(member, maxIndex)
 }

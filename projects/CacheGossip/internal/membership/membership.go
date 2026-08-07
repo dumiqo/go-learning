@@ -20,6 +20,7 @@ type member struct {
 	Url                string
 	Status             models.Status
 	LastSeen, LastSend time.Time
+	LastIndex          int
 }
 type MembershipStatus struct {
 	Members []MemberStatus
@@ -103,7 +104,7 @@ func (m *Membership) AddMember(
 	name string,
 	url string,
 	lastSeen time.Time) {
-	m.members[name] = member{name, url, models.NewStatus(lastSeen), lastSeen, time.Time{}}
+	m.members[name] = member{name, url, models.NewStatus(lastSeen), lastSeen, time.Time{}, 0}
 }
 func (m *Membership) Update(node models.NodeInfo) error {
 	m.mu.Lock()
@@ -125,10 +126,10 @@ func (m *Membership) Update(node models.NodeInfo) error {
 }
 
 func newMember(node models.NodeInfo) member {
-	return member{node.Name, node.Address, node.Status, node.LastSeen, time.Time{}}
+	return member{node.Name, node.Address, node.Status, node.LastSeen, time.Time{}, 0}
 }
 func updateMember(m member, node models.NodeInfo) member {
-	nm := member{node.Name, node.Address, node.Status, node.LastSeen, time.Time{}}
+	nm := member{node.Name, node.Address, node.Status, node.LastSeen, time.Time{}, m.LastIndex}
 
 	nm.LastSend = m.LastSend
 	return nm
@@ -177,6 +178,17 @@ func (m *Membership) lastSendMember() member {
 	return m.members[keys[0]]
 }
 
+func (m *Membership) UpdateMember(member member, lastSendIndex int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	item, exist := m.members[member.Name]
+	if !exist {
+		return
+	}
+	item.LastSend = time.Now().UTC()
+	m.members[member.Name] = item
+}
+
 func (m *Membership) UpdateSendedTime(member member) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -219,7 +231,7 @@ func randomItem(slice []string) string {
 func NewMembership(hosts map[string]string) *Membership {
 	members := make(map[string]member)
 	for k, v := range hosts {
-		members[k] = member{k, v, models.Suspect, time.Time{}, time.Time{}}
+		members[k] = member{k, v, models.Suspect, time.Time{}, time.Time{}, 0}
 	}
 	return &Membership{members, sync.RWMutex{}}
 }

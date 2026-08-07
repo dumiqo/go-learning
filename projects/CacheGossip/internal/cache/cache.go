@@ -13,7 +13,7 @@ type Cache struct {
 	log   *logger.Logger
 	items map[string]cacheItem
 
-	buffer *OperationBuffer
+	history *History
 
 	miss, hit int
 }
@@ -61,7 +61,7 @@ func (c *Cache) cleanExpired() {
 		c.mu.Lock()
 		for _, k := range toDelete {
 			delete(c.items, k)
-			c.buffer.Delete(k, time.Now().UTC())
+			c.history.Delete(k, time.Now().UTC())
 		}
 		c.mu.Unlock()
 	}
@@ -86,7 +86,7 @@ func (c *Cache) Set(key, value string, ttl, create time.Time) error {
 	}
 
 	c.items[key] = cacheItem{value, create, ttl}
-	err := c.buffer.Set(key, value, ttl, create)
+	err := c.history.Set(key, value, ttl, create)
 	if err != nil {
 		return fmt.Errorf("Error in saving to operation buffer. %s", err)
 	}
@@ -98,7 +98,7 @@ func (c *Cache) Delete(key string, time time.Time) error {
 	defer c.mu.Unlock()
 
 	delete(c.items, key)
-	err := c.buffer.Delete(key, time)
+	err := c.history.Delete(key, time)
 	if err != nil {
 		return fmt.Errorf("Error in saving to operation buffer. %s", err)
 	}
@@ -126,6 +126,6 @@ func (c *Cache) Get(key string) (string, bool) {
 func (c *Cache) Stat() CacheStat {
 	return CacheStat{len(c.items), c.miss, c.hit}
 }
-func (c *Cache) GetPendingOperations() []Operation {
-	return c.buffer.Get()
+func (c *Cache) GetPendingOperations(from int) []Operation {
+	return c.history.Get(from)
 }

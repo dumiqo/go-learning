@@ -6,13 +6,13 @@ import (
 	"time"
 )
 
-type OperationBuffer struct {
+type History struct {
 	mu         sync.RWMutex
-	operations map[string]Operation
+	operations []Operation
 }
 
-func NewOperations() *OperationBuffer {
-	return &OperationBuffer{sync.RWMutex{}, make(map[string]Operation)}
+func NewOperations() *History {
+	return &History{sync.RWMutex{}, make([]Operation, 0)}
 }
 
 type Operation struct {
@@ -21,33 +21,41 @@ type Operation struct {
 	Ttl, Created time.Time
 }
 
-func (p *OperationBuffer) Set(key, value string, ttl, time time.Time) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	v, exist := p.operations[key]
-	if !exist || v.Created.Before(time) {
-		p.operations[key] = Operation{models.Set, key, value, ttl, time}
-	}
+func (h *History) Set(key, value string, ttl, time time.Time) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.operations = append(h.operations, Operation{models.Set, key, value, ttl, time})
 	return nil
 }
 
-func (p *OperationBuffer) Delete(key string, time time.Time) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	v, exist := p.operations[key]
-	if exist && v.Created.Before(time) {
-		p.operations[key] = Operation{models.Delete, key, "", time, time}
-	}
+func (h *History) Delete(key string, time time.Time) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.operations = append(h.operations, Operation{models.Delete, key, "", time, time})
 	return nil
 }
 
-func (p *OperationBuffer) Get() []Operation {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	operations := make([]Operation, 0, len(p.operations))
-	for _, o := range p.operations {
-		operations = append(operations, o)
+func (h *History) Get(from int) []Operation {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	if len(h.operations) <= from {
+		return make([]Operation, 0)
 	}
-	clear(p.operations)
-	return operations
+
+	ops := h.operations[from:]
+	m := make(map[string]Operation)
+	for _, v := range ops {
+		op, exist := m[v.Key]
+		if !exist || op.Created.Before(v.Created) {
+			m[v.Key] = v
+		}
+	}
+	result := make([]Operation, 0, len(m))
+
+	for _, v := range m {
+		result = append(result, v)
+	}
+
+	return result
 }
