@@ -8,7 +8,7 @@ import (
 
 type OperationBuffer struct {
 	mu         sync.RWMutex
-	Operations map[string]Operation
+	operations map[string]Operation
 }
 
 func NewOperations() *OperationBuffer {
@@ -24,9 +24,9 @@ type Operation struct {
 func (p *OperationBuffer) Set(key, value string, ttl, time time.Time) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	v, exist := p.Operations[key]
+	v, exist := p.operations[key]
 	if !exist || v.Created.Before(time) {
-		p.Operations[key] = Operation{models.Set, key, value, ttl, time}
+		p.operations[key] = Operation{models.Set, key, value, ttl, time}
 	}
 	return nil
 }
@@ -34,9 +34,9 @@ func (p *OperationBuffer) Set(key, value string, ttl, time time.Time) error {
 func (p *OperationBuffer) Delete(key string, time time.Time) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	v, exist := p.Operations[key]
+	v, exist := p.operations[key]
 	if exist && v.Created.Before(time) {
-		p.Operations[key] = Operation{models.Delete, key, "", time, time}
+		p.operations[key] = Operation{models.Delete, key, "", time, time}
 	}
 	return nil
 }
@@ -44,10 +44,10 @@ func (p *OperationBuffer) Delete(key string, time time.Time) error {
 func (p *OperationBuffer) Get() []Operation {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	operations := make([]Operation, 0, len(p.Operations))
-	for _, o := range p.Operations {
+	operations := make([]Operation, 0, len(p.operations))
+	for _, o := range p.operations {
 		operations = append(operations, o)
 	}
-	clear(p.Operations)
+	clear(p.operations)
 	return operations
 }

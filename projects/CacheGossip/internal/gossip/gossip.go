@@ -155,8 +155,9 @@ func (g *Gossip) sendMembershipGossip() {
 func (g *Gossip) sendDataGossip() {
 	member := g.membership.GetMember()
 	g.logger.Info("Send data gossip to %s", member.Name)
-	operations := make([]models.Operation, len(g.cache.GetPendingOperations().Operations))
-	for _, o := range g.cache.GetPendingOperations().Operations {
+	allOp := g.cache.GetPendingOperations()
+	operations := make([]models.Operation, len(allOp))
+	for _, o := range allOp {
 		operations = append(operations, models.Operation{o.Key, o.Value, o.Type, o.Ttl, o.Created})
 	}
 	msg := models.NewOperationsGossip(g.nodeName, g.address, operations)

@@ -126,6 +126,6 @@ func (c *Cache) Get(key string) (string, bool) {
 func (c *Cache) Stat() CacheStat {
 	return CacheStat{len(c.items), c.miss, c.hit}
 }
-func (c *Cache) GetPendingOperations() *OperationBuffer {
-	return c.buffer
+func (c *Cache) GetPendingOperations() []Operation {
+	return c.buffer.Get()
 }
