@@ -126,9 +126,6 @@ func Run(cfg *config.Config) {
 	services.logger.Info("Shutting down...")
 
 	cancel()
-	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
 	servers.client.Shutdown(ctx)
 	servers.gossip.Shutdown(ctx)
 
