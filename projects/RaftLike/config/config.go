@@ -9,10 +9,15 @@ import (
 type Config struct {
 	AppName app
 	Http    http
+	RAFT    raft
 }
 
 type http struct {
 	Port int `env:"HTTP_PORT,required" envDefault:"8080"`
+}
+
+type raft struct {
+	Heartbet int `env:"RAFT_TIMEOUT_HEARTBEAT,required" envDefault:"50"`
 }
 
 type app struct {
