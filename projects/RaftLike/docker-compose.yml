@@ -1,0 +1,19 @@
+services:
+  first:
+    container_name: first
+    platform: linux/amd64
+    build:
+      context: .
+    environment:
+      APP_NAME: "first"
+      HTTP_PORT: "8080"
+    ports:
+      - "8081:8080"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: '1Gb'
+        reservations:
+          cpus: '0.2'
+          memory: '0.1Gb'
