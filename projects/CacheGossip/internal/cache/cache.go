@@ -69,7 +69,7 @@ func (c *Cache) cleanExpired() {
 }
 
 func NewCache(logger *logger.Logger) (*Cache, error) {
-	return &Cache{sync.RWMutex{}, logger, make(map[string]cacheItem), NewOperations(), 0, 0}, nil
+	return &Cache{sync.RWMutex{}, logger, make(map[string]cacheItem), NewHistory(), 0, 0}, nil
 }
 
 func (c *Cache) Start(cnx context.Context) {

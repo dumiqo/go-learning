@@ -11,7 +11,7 @@ type History struct {
 	operations []Operation
 }
 
-func NewOperations() *History {
+func NewHistory() *History {
 	return &History{sync.RWMutex{}, make([]Operation, 0)}
 }
 
