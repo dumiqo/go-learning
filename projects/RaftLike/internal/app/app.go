@@ -3,6 +3,7 @@ package app
 import (
 	"RaftLike/config"
 	"RaftLike/internal/api"
+	"RaftLike/internal/raft"
 	"RaftLike/internal/server"
 	"RaftLike/pkg/logger"
 	myMiddleware "RaftLike/pkg/middleware"
@@ -22,6 +23,7 @@ type App struct {
 	config *config.Config
 	logger *logger.Logger
 	server *server.Server
+	raft   *raft.Raft
 }
 
 func NewApp() (*App, error) {
@@ -35,7 +37,9 @@ func NewApp() (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Error in logger loading")
 	}
-	return &App{cfg, logger, server.NewServer(*cfg, logger)}, nil
+	ctx := context.Background()
+	raft := raft.NewRaft(raft.Follower, logger, cfg, ctx)
+	return &App{cfg, logger, server.NewServer(*cfg, logger), raft}, nil
 }
 
 func (a *App) Start() {

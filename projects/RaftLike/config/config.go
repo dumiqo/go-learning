@@ -17,7 +17,8 @@ type http struct {
 }
 
 type raft struct {
-	Heartbet int `env:"RAFT_TIMEOUT_HEARTBEAT,required" envDefault:"50"`
+	Heartbet int `env:"RAFT_TIMEOUT_HEARTBEAT,required" envDefault:"1000"`
+	Election int `env:"RAFT_TIMEOUT_HEARTBEAT,required" envDefault:"150"`
 }
 
 type app struct {
