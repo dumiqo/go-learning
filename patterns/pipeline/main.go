@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"math/rand/v2"
+	"runtime"
+	"sync"
 	"time"
 )
 
@@ -69,6 +71,32 @@ func isPrime(n int) bool {
 	}
 	return true
 }
+func fanIn(context context.Context, inputs ...<-chan int) chan int {
+	wg := sync.WaitGroup{}
+	output := make(chan int)
+
+	transfer := func(c <-chan int) {
+		defer wg.Done()
+		for i := range c {
+			select {
+			case <-context.Done():
+				return
+			case output <- i:
+			}
+		}
+	}
+
+	for _, input := range inputs {
+		wg.Add(1)
+		go transfer(input)
+	}
+
+	go func() {
+		wg.Wait()
+		close(output)
+	}()
+	return output
+}
 
 func main() {
 
@@ -78,8 +106,16 @@ func main() {
 	}
 
 	gen := generate(ctx, fn)
-	prim := prime(ctx, gen)
-	take := take(ctx, prim, 1000)
+
+	cpuNum := runtime.NumCPU()
+	primeChanels := make([]<-chan int, cpuNum)
+	for i := 0; i < cpuNum; i++ {
+		primeChanels[i] = prime(ctx, gen)
+	}
+
+	fanIn := fanIn(ctx, primeChanels...)
+
+	take := take(ctx, fanIn, 1000)
 	for i := range take {
 		fmt.Println(i)
 	}
